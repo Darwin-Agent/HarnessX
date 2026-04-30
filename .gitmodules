@@ -1,0 +1,3 @@
+[submodule "recipe/verl_harnessX/verl"]
+	path = recipe/verl_harnessX/verl
+	url = https://github.com/Darwin-Agent/verl.git

@@ -1,0 +1,17 @@
+[
+  "build-cython-ext",
+  "build-pmars",
+  "code-from-image",
+  "configure-git-webserver",
+  "constraints-scheduling",
+  "custom-memory-heap-crash",
+  "financial-document-processor",
+  "fix-code-vulnerability",
+  "fix-git",
+  "gcode-to-text",
+  "headless-terminal",
+  "openssl-selfsigned-cert",
+  "query-optimize",
+  "torch-pipeline-parallelism",
+  "vulnerable-secret"
+]

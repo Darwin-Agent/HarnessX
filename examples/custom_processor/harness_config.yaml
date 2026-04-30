@@ -1,0 +1,21 @@
+# HarnessX Harness Config — Custom Processor Example
+#
+# Demonstrates how to wire a user-defined processor via `_target_`.
+# This example keeps the pipeline minimal and adds one custom processor:
+#   examples.custom_processor.processors.simple_guard.SimpleGuardProcessor
+#
+# Run from repo root:
+#   hx -d examples/custom_processor/harness_config.yaml
+
+label: Custom Processor
+description: Minimal harness plus a custom processor example.
+lab_visible: false
+
+processors:
+  - _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+  - _target_: harnessx.processors.context.user_wrapper.UserWrapperProcessor
+  - _target_: examples.custom_processor.processors.simple_guard.SimpleGuardProcessor
+    blocked_patterns:
+      - "ignore all previous instructions"
+      - "reveal system prompt"
+    mode: "warn"

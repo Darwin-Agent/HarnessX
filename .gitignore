@@ -1,0 +1,112 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
+.harness_env/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Type checking
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Agent run outputs
+runs/
+traces/
+.test_e2e/
+.harnessx/
+oh_runs/
+recipe/gaia_evolver/skills/
+
+# Playwright screenshots (browser_tool writes to tmpdir, but guard local paths)
+screenshots/
+*.png
+*.jpg
+*.jpeg
+# Allow images under docs/assets/ (README illustrations)
+!docs/assets/**/*.png
+!docs/assets/**/*.jpg
+!docs/assets/**/*.svg
+
+# Node / frontend
+node_modules/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+checkpoints*
+.test_model
+.tips
+
+.codex
+.claude/
+wandb_logs/
+wandb/
+*.wandb
+
+# Slime recipe local data
+recipe/slime/checkpoints/
+recipe/slime/wandb_logs/
+logs/
+sessions/
+
+# Dataset files (downloaded by data_prep scripts, not committed)
+data/slime/
+data/locomo/
+*.bin
+results/
+*.pickle
+reports/
+
+# Local vector DB caches (ChromaDB)
+.locomo_chroma_clean/
+.locomo_chroma_verbatim/
+.chroma*/
+
+# Local dev / one-off scripts (not part of the package)
+speed_test.py
+benchmarks/tau2/show_report.py
+.benchmarks
+
+doc_think/
+uv.lock

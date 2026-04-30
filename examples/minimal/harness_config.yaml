@@ -1,0 +1,12 @@
+# HarnessX Harness Config — Minimal Agent
+# Bare-bones agent for debugging, rapid prototyping, and custom builds.
+# No memory, no compaction, no reliability guards — just raw LLM + tools.
+#
+# Load via CLI:
+#   harnessx -d examples/minimal/harness_config.yaml "your task"
+# Or explore in Harness Lab: select this example from the examples panel.
+
+label: Minimal
+description: Bare-bones agent — no guards, no memory, no compaction. Good for debugging and custom builds.
+
+processors: []

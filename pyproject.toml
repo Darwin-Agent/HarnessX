@@ -1,0 +1,102 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harnessx"
+version = "0.1.0"
+description = "A composable, research-oriented Agent Harness for LLM agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "zhao9797", email = "zhaok7878@gmail.com"},
+    {name = "tenghl", email = "tenghl@users.noreply.github.com"},
+]
+keywords = ["agent", "harness", "llm", "rl", "trajectory", "context-engine"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    # LLM providers & HTTP
+    "pydantic>=2.0",
+    "anthropic>=0.40",
+    "openai>=1.0",
+    "litellm>=1.40",
+    "httpx>=0.27",
+    # Logging & config
+    "structlog>=24.0",
+    "tiktoken>=0.7",
+    "loguru>=0.7",
+    "hydra-core>=1.3",
+    "omegaconf>=2.3",
+    "prompt_toolkit>=3.0",
+    # Lab web UI
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "websockets>=12.0",
+    "aiofiles>=23.0",
+    # Browser automation
+    "playwright>=1.45",
+    "html2text>=2024.0",
+    # MCP server support
+    "mcp>=1.0",
+    # OpenTelemetry tracing
+    "opentelemetry-sdk>=1.25",
+    "opentelemetry-exporter-otlp>=1.25",
+    # Sandbox backends
+    "docker>=7.0",
+    "e2b>=0.17",
+    # Document / office skills
+    "python-pptx>=0.6.21",
+    "python-docx>=1.0.0",
+    "openpyxl>=3.1.0",
+    "reportlab>=4.0",
+    "pdfplumber>=0.10",
+]
+
+[project.scripts]
+hx = "harnessx.cli:main"
+harnessx = "harnessx.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Darwin-Agent/HarnessX"
+Repository = "https://github.com/Darwin-Agent/HarnessX"
+Issues = "https://github.com/Darwin-Agent/HarnessX/issues"
+Changelog = "https://github.com/Darwin-Agent/HarnessX/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "anyio>=4.0", "cachetools>=5.3"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["harnessx*"]
+
+[tool.setuptools.package-data]
+# extensions/skills/ is in the repo root (not shipped as pip package data).
+# docs/ at the project root is for developer documentation only (not shipped).
+"harnessx" = [
+    "workspace/default_prompts/**/*.md",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "--ignore=tests/e2e"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = ["E402", "E501"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

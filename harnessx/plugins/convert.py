@@ -1,0 +1,179 @@
+# Copyright 2026 Darwin-Agent
+# SPDX-License-Identifier: MIT
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+
+def convert_claude_plugin(src: Path, dst: Path | None = None) -> Path:
+    """Convert a Claude Code plugin directory to an HarnessX plugin.
+
+    Supports both root-level ``plugin.json`` and Claude Code native
+    ``.claude-plugin/plugin.json`` source layouts.
+
+    Args:
+        src: Source directory (HarnessX root or Claude Code plugin root).
+        dst: Destination directory.  Defaults to ``{src}_oh`` (sibling directory).
+
+    Returns:
+        Path to the created HarnessX plugin directory.
+    """
+    src = src.resolve()
+
+    # Locate the source manifest — check both layouts
+    root_manifest = src / "plugin.json"
+    cc_manifest = src / ".claude-plugin" / "plugin.json"
+    commands_base = src / "commands"  # always at src root for both formats
+
+    if root_manifest.exists():
+        manifest_path = root_manifest
+    elif cc_manifest.exists():
+        manifest_path = cc_manifest
+    else:
+        raise FileNotFoundError(
+            f"No plugin.json found in {src} or {src / '.claude-plugin'}. "
+            "Pass a directory that contains a Claude Code plugin manifest."
+        )
+
+    if dst is None:
+        dst = src.parent / f"{src.name}_oh"
+    dst = Path(dst).resolve()
+
+    if dst.exists():
+        raise FileExistsError(f"Destination already exists: {dst}. Remove it or choose a different --output path.")
+
+    with open(manifest_path, encoding="utf-8") as f:
+        manifest: dict = json.load(f)
+
+    commands = _collect_commands(commands_base, manifest)
+    dst.mkdir(parents=True)
+
+    # Copy commands/ directory if present
+    if commands_base.is_dir():
+        shutil.copytree(commands_base, dst / "commands")
+
+    # Copy skills/ and hooks/ directories verbatim — loader auto-discovers them
+    for extra_dir in ("skills", "hooks", "scripts"):
+        src_extra = src / extra_dir
+        if src_extra.is_dir():
+            shutil.copytree(src_extra, dst / extra_dir)
+
+    plugin_name = manifest.get("name", src.name)
+    safe_name = plugin_name.replace("-", "_")
+
+    processor_stubs = []
+    for cmd in commands:
+        cmd_name = cmd.get("name", "command")
+        processor_stubs.append(
+            {
+                "target": f"processors.{cmd_name}_processor.{_to_class_name(cmd_name)}Processor",
+                "_note": "TODO: implement this processor or remove this entry",
+            }
+        )
+
+    slash_stubs = []
+    for cmd in commands:
+        cmd_name = cmd.get("name", "command")
+        slash_stubs.append(
+            {
+                "command": f"/{cmd_name}",
+                "slot": f"_{safe_name}_{cmd_name}",
+                "_note": "TODO: set slot key and implement processor, or remove for prompt-injection only",
+            }
+        )
+
+    out_manifest = dict(manifest)
+    out_manifest["commands"] = commands
+    out_manifest["processors"] = processor_stubs
+    out_manifest["tools"] = [
+        {
+            "target": f"{safe_name}.tools.example_tool",
+            "_note": "TODO: add your tools or remove",
+        }
+    ]
+    out_manifest["slash_commands"] = slash_stubs
+
+    with open(dst / "plugin.json", "w", encoding="utf-8") as f:
+        json.dump(out_manifest, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+    processors_dir = dst / "processors"
+    processors_dir.mkdir(exist_ok=True)
+    (processors_dir / "__init__.py").write_text("", encoding="utf-8")
+
+    for cmd in commands:
+        cmd_name = cmd.get("name", "command")
+        class_name = _to_class_name(cmd_name)
+        stub_path = processors_dir / f"{cmd_name}_processor.py"
+        if not stub_path.exists():
+            stub_path.write_text(
+                _PROCESSOR_STUB_TEMPLATE.format(
+                    class_name=class_name,
+                    cmd_name=cmd_name,
+                    slot_key=f"_{safe_name}_{cmd_name}",
+                ),
+                encoding="utf-8",
+            )
+
+    return dst
+
+
+def _collect_commands(commands_dir: Path, manifest: dict) -> list[dict]:
+    """Return command dicts from ``commands/*.md`` (preferred) or ``manifest['commands']``."""
+    from .loader import _md_file_to_command
+
+    if commands_dir.is_dir():
+        commands = [_md_file_to_command(f) for f in sorted(commands_dir.glob("*.md"))]
+        if commands:
+            return commands
+
+    raw = manifest.get("commands", [])
+    if isinstance(raw, list):
+        return [c if isinstance(c, dict) else {"name": str(c)} for c in raw]
+    return []
+
+
+def _to_class_name(name: str) -> str:
+    """Convert kebab-case or snake_case to PascalCase."""
+    return "".join(part.capitalize() for part in name.replace("-", "_").split("_"))
+
+
+_PROCESSOR_STUB_TEMPLATE = '''\
+"""Processor for the /{cmd_name} slash command.
+
+This file was generated by ``harnessx plugin convert``.
+
+Implement the logic for /{cmd_name} here:
+  1. Check for the slot marker in on_task_start.
+  2. Perform the command's action.
+  3. Clear the slot so the next turn doesn't re-trigger.
+"""
+from __future__ import annotations
+
+from typing import AsyncIterator, TYPE_CHECKING
+
+from harnessx.core.processor import MultiHookProcessor
+
+if TYPE_CHECKING:
+    from harnessx.core.events import TaskStartEvent
+
+
+class {class_name}Processor(MultiHookProcessor):
+    _singleton_group = "{cmd_name}_processor"
+    _order = 10  # TODO: adjust priority
+
+    async def on_task_start(self, event: "TaskStartEvent") -> AsyncIterator:
+        state = event.state
+
+        if state.slots.get("{slot_key}") is not None:
+            del state.slots["{slot_key}"]
+
+            # TODO: implement your command logic here
+            # Example:
+            #   result = do_something(state)
+            #   print(result)
+
+        yield event
+'''

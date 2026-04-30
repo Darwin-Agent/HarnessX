@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS variable system — shared with Lab UI (light + dark) */
+
+:root {
+  color-scheme: light;
+  --font-scale: 1;
+
+  --bg-base:     #f5f5f7;
+  --bg-card:     #ffffff;
+  --bg-elevated: #ededf0;
+  --border:      #d1d1d6;
+  --border-sub:  #e5e5ea;
+
+  --text-1: #1c1c1e;
+  --text-2: #3a3a3c;
+  --text-3: #8e8e93;
+  --text-4: #c7c7cc;
+
+  --accent:      #4f46e5;
+  --accent-dim:  #4338ca;
+  --accent-bg:   rgba(79, 70, 229, 0.07);
+  --accent-ring: rgba(79, 70, 229, 0.22);
+  --accent-glow: none;
+
+  --chip-bg:      #ededf0;
+  --chip-border:  #d1d1d6;
+  --chip-text:    #3a3a3c;
+  --chip-sel-bg:  rgba(79, 70, 229, 0.09);
+  --chip-sel-bd:  rgba(79, 70, 229, 0.35);
+  --chip-sel-txt: #4f46e5;
+
+  --shadow-card:       0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(209,209,214,0.7);
+  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.10), 0 0 0 1px rgba(179,179,184,0.6);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --bg-base:     #0a0a0f;
+  --bg-card:     #111118;
+  --bg-elevated: #18181f;
+  --border:      #27272f;
+  --border-sub:  #1e1e26;
+
+  --text-1: #f0f0f5;
+  --text-2: #a8a8b3;
+  --text-3: #5c5c6e;
+  --text-4: #2e2e3a;
+
+  --accent:      #818cf8;
+  --accent-dim:  #6366f1;
+  --accent-bg:   rgba(129, 140, 248, 0.09);
+  --accent-ring: rgba(129, 140, 248, 0.25);
+  --accent-glow: 0 0 16px rgba(129, 140, 248, 0.30);
+
+  --chip-bg:      #18181f;
+  --chip-border:  #27272f;
+  --chip-text:    #a8a8b3;
+  --chip-sel-bg:  rgba(129, 140, 248, 0.12);
+  --chip-sel-bd:  rgba(129, 140, 248, 0.45);
+  --chip-sel-txt: #818cf8;
+
+  --shadow-card:       0 1px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(39,39,47,0.9);
+  --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.55), 0 0 0 1px rgba(60,60,75,0.8);
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-1);
+  }
+  button { cursor: pointer; border: none; outline: none; }
+  input, textarea { outline: none; }
+}
+
+/* ── Markdown doc rendering (.doc-content) ─────────────────────────────────── */
+.doc-content { color: var(--text-1); line-height: 1.75; font-size: 14px; }
+.doc-content h1 { font-size: 22px; font-weight: 700; color: var(--text-1); letter-spacing: -0.02em; margin: 0 0 8px; line-height: 1.25; }
+.doc-content h2 { font-size: 17px; font-weight: 700; color: var(--text-1); letter-spacing: -0.01em; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.doc-content h3 { font-size: 14.5px; font-weight: 600; color: var(--text-1); margin: 20px 0 8px; }
+.doc-content h4 { font-size: 13px; font-weight: 600; color: var(--text-2); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.doc-content p  { margin: 0 0 12px; color: var(--text-2); }
+.doc-content a  { color: var(--accent); text-decoration: none; }
+.doc-content a:hover { text-decoration: underline; }
+.doc-content ul, .doc-content ol { margin: 0 0 12px 0; padding-left: 20px; color: var(--text-2); }
+.doc-content ul { list-style: disc outside; }
+.doc-content ol { list-style: decimal outside; }
+.doc-content li { margin: 4px 0; }
+.doc-content li + li { margin-top: 2px; }
+.doc-content code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: var(--bg-elevated); color: var(--text-1); padding: 2px 6px; border-radius: 5px; border: 1px solid var(--border-sub); }
+.doc-content pre { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 0 0 16px; }
+.doc-content pre code { background: none; border: none; padding: 0; font-size: 12.5px; color: var(--text-1); line-height: 1.6; }
+.doc-content blockquote { margin: 0 0 12px; padding: 10px 16px; border-left: 3px solid var(--accent); background: var(--accent-bg); border-radius: 0 8px 8px 0; color: var(--text-2); font-style: italic; }
+.doc-content blockquote p { margin: 0; }
+.doc-content table { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 13px; }
+.doc-content thead th { text-align: left; font-weight: 600; color: var(--text-1); padding: 8px 12px; background: var(--bg-elevated); border: 1px solid var(--border); }
+.doc-content tbody td { padding: 8px 12px; border: 1px solid var(--border); color: var(--text-2); vertical-align: top; }
+.doc-content tbody tr:hover td { background: var(--bg-elevated); }
+.doc-content hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+.doc-content strong { color: var(--text-1); font-weight: 600; }
+.doc-content em    { color: var(--text-2); }
+
+/* ── chat-md: Markdown rendering styles (shared with Lab UI) ─────────────── */
+.chat-md {
+  color: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.chat-md > :first-child { margin-top: 0; }
+.chat-md > :last-child  { margin-bottom: 0; }
+.chat-md h1,.chat-md h2,.chat-md h3,.chat-md h4 {
+  color: var(--text-1); font-weight: 650; margin: 0 0 8px; line-height: 1.35;
+}
+.chat-md h1 { font-size: 18px; }
+.chat-md h2 { font-size: 16px; }
+.chat-md h3 { font-size: 15px; }
+.chat-md h4 { font-size: 14px; }
+.chat-md p  { margin: 0 0 10px; color: inherit; }
+.chat-md ul,.chat-md ol { margin: 0 0 10px 0; padding-left: 22px; }
+.chat-md ul { list-style: disc outside; }
+.chat-md ol { list-style: decimal outside; }
+.chat-md li { margin: 3px 0; }
+.chat-md li > p { margin: 0; }
+.chat-md code {
+  font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+  background: var(--bg-elevated); border: 1px solid var(--border-sub);
+  border-radius: 5px; padding: 1px 5px;
+}
+.chat-md pre {
+  margin: 0 0 10px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-elevated); overflow-x: auto;
+}
+.chat-md pre code { background: transparent; border: 0; padding: 0; }
+.chat-md blockquote {
+  margin: 0 0 10px; padding: 6px 12px;
+  border-left: 3px solid var(--accent); background: var(--accent-bg); color: var(--text-2);
+}
+.chat-md a { color: var(--accent); text-decoration: none; }
+.chat-md a:hover { text-decoration: underline; }
+.chat-md hr { margin: 12px 0; border: 0; border-top: 1px solid var(--border); }
+.chat-md table { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
+.chat-md th,.chat-md td { border: 1px solid var(--border); padding: 6px 8px; vertical-align: top; }
+.chat-md th { background: var(--bg-elevated); color: var(--text-1); font-weight: 600; }

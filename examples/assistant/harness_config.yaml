@@ -1,0 +1,32 @@
+# HarnessX Harness Config — Personal Assistant
+# Conversational assistant with memory, compaction, and reliability guards.
+#
+# Load via CLI:
+#   harnessx -d examples/assistant/harness_config.yaml "your task"
+# Or explore in Harness Lab: select this example from the examples panel.
+
+label: Personal Assistant
+description: Conversational assistant with memory and compaction. Enable skill_loader for writing and research skills.
+
+processors:
+  - _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+  - _target_: harnessx.processors.context.env_context_injector.EnvironmentContextInjector
+  - _target_: harnessx.processors.memory.memory_extraction.MemoryExtractionProcessor
+    memory:
+      _target_: harnessx.processors.memory.strategies.sliding_window.SlidingWindowMemory
+      n: 20
+    threshold: 140000
+  - _target_: harnessx.processors.memory.memory_retrieval.MemoryRetrievalProcessor
+    memory:
+      _target_: harnessx.processors.memory.strategies.sliding_window.SlidingWindowMemory
+      n: 20
+    top_k: 10
+  - _target_: harnessx.processors.control.loop_detection.LoopDetectionProcessor
+  - _target_: harnessx.processors.control.tool_call_correction.ToolCallCorrectionLayer
+  - _target_: harnessx.processors.control.parse_retry.ParseRetryProcessor
+  - _target_: harnessx.processors.control.tool_failure_guard.ToolFailureGuard
+  - _target_: harnessx.processors.control.repeated_edit_detector.RepeatedFileEditDetector
+  - _target_: harnessx.processors.control.compaction.CompactionProcessor
+    token_threshold: 140000
+  - _target_: harnessx.processors.control.token_budget.TokenBudgetProcessor
+  - _target_: harnessx.processors.observability.otel_proc.OTelProcessor

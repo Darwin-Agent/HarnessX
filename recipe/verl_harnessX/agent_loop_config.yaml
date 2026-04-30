@@ -1,0 +1,2 @@
+- name: harnessx_agent
+  _target_: verl_harnessX.agent_loop.HarnessXAgentLoop

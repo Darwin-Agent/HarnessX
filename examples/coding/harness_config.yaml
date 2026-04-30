@@ -1,0 +1,33 @@
+# HarnessX Harness Config — Coding Agent
+# Software engineering specialist with larger memory, tighter compaction,
+# and skill loading for code-specific capabilities.
+#
+# Load via CLI:
+#   harnessx -d examples/coding/harness_config.yaml "your task"
+# Or explore in Harness Lab: select this example from the examples panel.
+
+label: Coding Agent
+description: Software engineering specialist — larger memory, tighter compaction, skill loading for code-specific capabilities.
+
+processors:
+  - _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+  - _target_: harnessx.processors.context.env_context_injector.EnvironmentContextInjector
+  - _target_: harnessx.processors.memory.memory_extraction.MemoryExtractionProcessor
+    memory:
+      _target_: harnessx.processors.memory.strategies.sliding_window.SlidingWindowMemory
+      n: 40
+    threshold: 80000
+  - _target_: harnessx.processors.memory.memory_retrieval.MemoryRetrievalProcessor
+    memory:
+      _target_: harnessx.processors.memory.strategies.sliding_window.SlidingWindowMemory
+      n: 40
+    top_k: 10
+  - _target_: harnessx.processors.control.loop_detection.LoopDetectionProcessor
+  - _target_: harnessx.processors.control.tool_call_correction.ToolCallCorrectionLayer
+  - _target_: harnessx.processors.control.parse_retry.ParseRetryProcessor
+  - _target_: harnessx.processors.control.tool_failure_guard.ToolFailureGuard
+  - _target_: harnessx.processors.control.repeated_edit_detector.RepeatedFileEditDetector
+  - _target_: harnessx.processors.control.compaction.CompactionProcessor
+    token_threshold: 80000
+  - _target_: harnessx.processors.control.token_budget.TokenBudgetProcessor
+  - _target_: harnessx.processors.tools.skill_loader.ProgressiveSkillLoader

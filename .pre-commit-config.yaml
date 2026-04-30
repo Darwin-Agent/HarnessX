@@ -1,0 +1,28 @@
+repos:
+  # ── Basic file checks ─────────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: detect-private-key        # block private keys (PEM, SSH key, etc.)
+      - id: check-added-large-files   # reject large files (default 500 KB)
+        args: [--maxkb=1024]
+      - id: check-merge-conflict      # check for leftover conflict markers
+      - id: check-yaml                # YAML syntax check
+      - id: check-toml                # TOML syntax check
+      - id: end-of-file-fixer         # ensure files end with a newline
+      - id: trailing-whitespace       # strip trailing whitespace
+      - id: mixed-line-ending         # normalize line endings
+
+  # ── Python lint & formatting ──────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.5
+    hooks:
+      - id: ruff                      # lint (includes isort)
+        args: [--fix]
+      - id: ruff-format               # format
+
+  # ── GitHub Actions workflow syntax check ──────────────────────────────────────
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.7
+    hooks:
+      - id: actionlint

@@ -1,0 +1,56 @@
+# HarnessX Harness Config — tau2-bench
+#
+# Hardened harness for tau2-bench with loop detection, parse retry,
+# tool call correction, failure guard, and phase-aware tool filtering.
+# tau2 owns the simulation loop, user simulator, tools, and system prompt.
+#
+# Usage (Python):
+#   import yaml
+#   from harnessx.core.builder import build_from_config
+#
+#   raw = yaml.safe_load(Path("benchmarks/tau2/harness_config.yaml").read_text())
+#   config = build_from_config(raw).copy(
+#       tracer=HarnessJournal(base_dir=logs_dir, export_jsonl=True),
+#       tool_registry=tool_registry,   # built by tau2 agent setup
+#   )
+
+
+processors:
+
+  # ── Context ─────────────────────────────────────────────────────────────────
+  # tau2 injects its own system prompt externally; Null strategy passes it through.
+  - _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+    system_builder:
+      _target_: harnessx.processors.context.strategies.system_prompt.null.NullSystemPromptBuilder
+
+  # Policy hints for mobile_data_issue tasks (off by default — enable per run):
+  # - _target_: benchmarks.tau2.policy_hint.PolicyHintProcessor
+
+  # ── Context window safety ────────────────────────────────────────────────────
+  # Hard truncation when assembled context exceeds model window fraction.
+  - _target_: harnessx.processors.control.token_budget.TokenBudgetProcessor
+
+  # ── Loop detection ───────────────────────────────────────────────────────────
+  # tau2 confirmation tasks (roaming, data checks) are prone to repeated
+  # identical tool calls; detect and raise LoopDetectedError early.
+  - _target_: harnessx.processors.control.loop_detection.LoopDetectionProcessor
+
+  # ── Parse / tool-call reliability ───────────────────────────────────────────
+  # Validate model output format; retry up to N times before raising.
+  - _target_: harnessx.processors.control.parse_retry.ParseRetryProcessor
+
+  # Coerce common parameter type mismatches (bool as string, int as float, etc.)
+  # before dispatch — tau2 stub tools have strict parameter types.
+  - _target_: harnessx.processors.control.tool_call_correction.ToolCallCorrectionLayer
+
+  # Raise ToolFailureLimitError after too many consecutive tool errors per turn.
+  - _target_: harnessx.processors.control.tool_failure_guard.ToolFailureGuard
+
+  # ── Phase-aware tool filter ──────────────────────────────────────────────────
+  # Steps 0-1: read-only tools only (get_*, list_*, search_*, find_*, ...).
+  # Step 2+:   all tools unlocked.
+  # Prevents premature action calls before the agent has diagnosed the issue.
+  - _target_: harnessx.processors.tools.tool_filter.ToolFilterProcessor
+    tool_filter:
+      _target_: benchmarks.tau2.tool_filter.PhaseAwareToolFilter
+      read_only_steps: 2

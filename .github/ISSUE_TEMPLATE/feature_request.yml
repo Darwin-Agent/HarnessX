@@ -1,0 +1,61 @@
+name: Feature Request
+description: Suggest a new feature or improvement for HarnessX
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please describe your use case clearly.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: What problem are you trying to solve? What limitation are you hitting?
+      placeholder: "Currently it's not possible to ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the feature or change you'd like to see.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the project does this relate to?
+      multiple: true
+      options:
+        - Core harness / builder
+        - Processors
+        - Plugins / extensions
+        - Providers
+        - Sandbox
+        - Tools / MCP
+        - Lab UI
+        - Benchmarks
+        - RL / training
+        - CLI
+        - Docs
+        - CI/CD
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any workarounds or alternative approaches you've considered?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Links, prior art, or anything else that might be helpful.

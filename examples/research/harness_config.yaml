@@ -1,0 +1,34 @@
+# HarnessX Harness Config — Deep Research
+# Long-horizon research agent with LLM judge evaluation and cost guardrail.
+# Reliability guards are disabled to allow sustained exploration.
+# Pairs with a judge provider for automatic result evaluation.
+#
+# Load via CLI:
+#   harnessx -d examples/research/harness_config.yaml "your task"
+# Or explore in Harness Lab: select this example from the examples panel.
+
+label: Deep Research
+description: Long-horizon research with LLM judge evaluation and $5 cost guard. Reliability guards disabled for sustained exploration.
+
+processors:
+  - _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+  - _target_: harnessx.processors.context.env_context_injector.EnvironmentContextInjector
+  - _target_: harnessx.processors.memory.memory_extraction.MemoryExtractionProcessor
+    memory:
+      _target_: harnessx.processors.memory.strategies.sliding_window.SlidingWindowMemory
+      n: 50
+    threshold: 120000
+  - _target_: harnessx.processors.memory.memory_retrieval.MemoryRetrievalProcessor
+    memory:
+      _target_: harnessx.processors.memory.strategies.sliding_window.SlidingWindowMemory
+      n: 50
+    top_k: 10
+  - _target_: harnessx.processors.control.cost_guard.CostGuardProcessor
+    max_usd: 5.0
+  - _target_: harnessx.processors.control.compaction.CompactionProcessor
+    token_threshold: 120000
+  - _target_: harnessx.processors.control.token_budget.TokenBudgetProcessor
+  - _target_: harnessx.processors.evaluation.evaluation.EvaluationProcessor
+    evaluator:
+      _target_: harnessx.processors.evaluation.strategies.evaluators.llm_judge.LLMJudgeEvaluator
+  - _target_: harnessx.processors.observability.otel_proc.OTelProcessor

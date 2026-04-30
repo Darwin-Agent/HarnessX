@@ -1,0 +1,42 @@
+hydra:
+  searchpath:
+    - file:///${VERL_ROOT}/verl/trainer/config  # veRL built-in trainer config directory
+
+defaults:
+  - ppo_trainer   # Inherit veRL PPO/GRPO trainer defaults (full actor/critic/rollout/ref schema)
+  - _self_        # Values in this file override ppo_trainer defaults
+
+data:
+  custom_cls:
+    path: "${SCRIPT_DIR}/dataset.py"  # Custom dataset class file path
+    name: TextOnlyDataset             # Dataset class: loads prompts from parquet, builds chat format
+  apply_chat_template_kwargs:
+    enable_thinking: true   # Enable Qwen3.5 thinking mode (<think>...</think> tags wrap reasoning)
+
+actor_rollout_ref:
+  rollout:
+    multi_turn:
+      enable: True                        # Enable multi-turn rollout (generate -> tool call -> result -> continue)
+      max_assistant_turns: 12             # Max assistant turns
+      max_user_turns: 12                  # Max user (tool result) turns
+      max_parallel_calls: 8              # Max parallel tool calls per turn
+      max_tool_response_length: 2048     # Max tokens per tool response; truncated if exceeded
+      tool_response_truncate_side: left  # Truncate from left (preserve most recent content)
+      format: qwen3_coder                # Chat format template (matches Qwen3.5 tool_call/tool_response format)
+      force_answer_remaining_tokens: 1000  # Force final answer when remaining tokens < this threshold
+      max_new_tokens_per_turn: 1024      # Max new tokens generated per assistant turn
+      tool_names:                        # Available tools injected into system prompt
+        - WebSearch                      #   Web search (MCP primary + DDG fallback)
+        - WebFetch                       #   Web page fetching (httpx static + Playwright fallback)
+        - Browser                        #   Browser control (navigate/click/get_text/screenshot/type)
+        - Bash                           #   Shell command execution
+        - CodeInterpreter               #   Python sandboxed code execution
+        - Read                           #   Local file reader (text/PDF/DOCX/XLSX/PPTX)
+    agent:
+      num_workers: 16                    # Parallel agent workers (each handles batch_size*n/16 sequences)
+      default_agent_loop: harnessx_agent # Default agent loop implementation name
+      agent_loop_config_path: "${SCRIPT_DIR}/agent_loop_config.yaml"  # Agent loop config file
+
+custom_reward_function:
+  path: "${SCRIPT_DIR}/reward.py"  # Custom reward function file path
+  name: compute_score  # Reward function: returns 0.8*accuracy + 0.1*format + 0.1*tool_call
