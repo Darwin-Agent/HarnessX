@@ -252,6 +252,11 @@ class CronManager:
                     logger.debug("[cron] heartbeat skipped — outside active hours")
                     continue
 
+            # Overlap guard: skip if previous run is still in progress
+            if state and state.last_status == "running":
+                logger.info("[cron] job '%s' still running from previous tick — skipping", job.name)
+                continue
+
             await self._run_job(job)
 
     async def _run_job(self, job: CronJob) -> None:
@@ -328,6 +333,9 @@ class CronManager:
     def create_job(self, spec: dict) -> CronJob:
         if not spec.get("id"):
             spec["id"] = str(uuid.uuid4())[:8]
+        # Clamp timeout to safe bounds
+        if "timeout" in spec:
+            spec["timeout"] = max(10, min(600, int(spec["timeout"])))
         job = CronJob.from_dict(spec)
         self._jobs[job.id] = job
         self._states[job.id] = CronJobState()
@@ -365,6 +373,9 @@ class CronManager:
     async def run_now(self, job_id: str) -> bool:
         job = self._jobs.get(job_id)
         if not job or job.id == HEARTBEAT_JOB_ID:
+            return False
+        state = self._states.get(job_id)
+        if state and state.last_status == "running":
             return False
         asyncio.create_task(self._run_job(job), name=f"cron:run_now:{job_id}")
         return True
