@@ -90,8 +90,10 @@ class IMUserContextProcessor(MultiHookProcessor):
 
         # Tail is guaranteed user by the guard above; only mutate this message.
         m = messages[-1]
-        old_content = m.content if isinstance(m.content, str) else str(m.content)
-        new_content = f"{header}\n\n{old_content}"
+        if isinstance(m.content, str):
+            new_content = f"{header}\n\n{m.content}"
+        else:
+            new_content = [{"type": "text", "text": header}, *m.content]
         messages[-1] = dataclasses.replace(m, content=new_content)
 
         yield dataclasses.replace(event, messages=tuple(messages))

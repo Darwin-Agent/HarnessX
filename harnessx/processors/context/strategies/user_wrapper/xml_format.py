@@ -16,4 +16,8 @@ class XMLFormatWrapper:
         self.format_instruction = format_instruction
 
     async def wrap(self, message: "Message", task: "BaseTask") -> "Message":
-        return dataclasses.replace(message, content=f"{message.content}\n\n{self.format_instruction}")
+        if isinstance(message.content, str):
+            new_content = f"{message.content}\n\n{self.format_instruction}"
+        else:
+            new_content = [*message.content, {"type": "text", "text": self.format_instruction}]
+        return dataclasses.replace(message, content=new_content)

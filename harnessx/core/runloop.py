@@ -971,5 +971,11 @@ def _recover_best_output(messages: "list[Message]", current_output: str) -> str:
     # 4. Fall back to tool result
     for m in reversed(messages):
         if m.role == "tool" and m.content:
-            return m.content if isinstance(m.content, str) else str(m.content)
+            if isinstance(m.content, str):
+                return m.content
+            if isinstance(m.content, list):
+                parts = [b.get("text", "") for b in m.content if isinstance(b, dict) and b.get("type") == "text"]
+                if parts:
+                    return "\n".join(parts)
+            return str(m.content)
     return current_output

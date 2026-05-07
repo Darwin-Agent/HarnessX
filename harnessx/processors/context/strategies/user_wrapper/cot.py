@@ -16,4 +16,8 @@ class ChainOfThoughtWrapper:
         self.guidance = guidance
 
     async def wrap(self, message: "Message", task: "BaseTask") -> "Message":
-        return dataclasses.replace(message, content=f"{message.content}\n\n{self.guidance}")
+        if isinstance(message.content, str):
+            new_content = f"{message.content}\n\n{self.guidance}"
+        else:
+            new_content = [*message.content, {"type": "text", "text": self.guidance}]
+        return dataclasses.replace(message, content=new_content)
