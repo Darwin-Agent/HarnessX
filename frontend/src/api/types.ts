@@ -220,12 +220,13 @@ export interface ModelSlot {
 
 // ── Multimodal attachments & task content ────────────────────────────────────
 
-/** Base64-encoded image attachment — stored on user ChatMessage for rendering. */
+/** Image attachment — stored on user ChatMessage for rendering. */
 export interface Attachment {
   type:       'image'
   media_type: string    // image/png | image/jpeg | image/gif | image/webp
-  data:       string    // raw base64, NO "data:..." prefix
+  data:       string    // raw base64, NO "data:..." prefix (empty if url is set)
   name?:      string    // original filename, display only
+  url?:       string    // server media URL (alternative to inline base64)
 }
 
 /** Single content block sent to the backend (Anthropic wire format). */
@@ -490,7 +491,7 @@ export interface SessionListResponse {
 
 export interface SessionDisplayMessage {
   role:          'user' | 'assistant' | 'system'
-  content:       string
+  content:       string | TaskBlock[]  // string or Anthropic content blocks (multimodal)
   tool_calls:    Array<{ name: string; id: string; output?: string }>
   /** Per-step trace data populated from the companion trace JSONL (assistant messages). */
   step_traces?:  StepTrace[]

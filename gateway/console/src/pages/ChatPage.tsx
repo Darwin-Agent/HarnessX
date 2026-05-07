@@ -3,17 +3,48 @@ import { Plus, RefreshCw, Square } from 'lucide-react'
 import { api } from '@gw/api/client'
 import { useSlotsStore } from '@lab/store/slots'
 import { useT } from '@gw/i18n'
-import type { GatewaySessionMeta, SessionDisplayMessage, ChatMessage, MessageBlock } from '@gw/api/types'
+import type { GatewaySessionMeta, SessionDisplayMessage, ChatMessage, MessageBlock, Attachment, TaskBlock } from '@gw/api/types'
 import { ChatPanel } from '@lab/components/chat/ChatPanel'
 import { ChatInput } from '@lab/components/chat/ChatInput'
 
 // ── Type adapter ──────────────────────────────────────────────────────────────
 
+function parseMultimodalContent(content: unknown): { text: string; attachments: Attachment[] } {
+  if (typeof content === 'string') return { text: content, attachments: [] }
+  if (!Array.isArray(content)) return { text: String(content ?? ''), attachments: [] }
+  const textParts: string[] = []
+  const attachments: Attachment[] = []
+  for (const block of content) {
+    if (block?.type === 'text') textParts.push(block.text ?? '')
+    else if (block?.type === 'image') {
+      if (block.media_url) {
+        // Server-referenced media file — use URL directly
+        attachments.push({
+          type: 'image',
+          media_type: block.media_type ?? 'image/jpeg',
+          data: '',
+          url: block.media_url,
+        })
+      } else if (block.source?.data) {
+        // Inline base64
+        attachments.push({
+          type: 'image',
+          media_type: block.source.media_type ?? 'image/png',
+          data: block.source.data,
+        })
+      }
+    }
+  }
+  return { text: textParts.join('\n'), attachments }
+}
+
 function toLabMsg(msg: SessionDisplayMessage): ChatMessage {
   if (msg.role !== 'assistant' || !msg.tool_calls?.length) {
+    const { text, attachments } = parseMultimodalContent(msg.content)
     return {
       role: msg.role,
-      content: msg.content,
+      content: text,
+      ...(attachments.length > 0 ? { attachments } : {}),
       stepTraces: msg.step_traces,
       query_context: msg.query_context,
     }
@@ -29,10 +60,11 @@ function toLabMsg(msg: SessionDisplayMessage): ChatMessage {
       })
     }
   }
-  if (msg.content) blocks.push({ type: 'text', content: msg.content })
+  const { text: assistantText } = parseMultimodalContent(msg.content)
+  if (assistantText) blocks.push({ type: 'text', content: assistantText })
   return {
     role: msg.role,
-    content: msg.content,
+    content: assistantText,
     blocks,
     stepTraces: msg.step_traces,
     query_context: msg.query_context,
@@ -92,6 +124,7 @@ export function ChatPage() {
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [history, setHistory]             = useState<SessionDisplayMessage[]>([])
   const [pendingMsg, setPendingMsg]       = useState('')
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([])
   const [streamingText, setStreamingText] = useState('')
   const [isRunning, setIsRunning]         = useState(false)
   const [runId, setRunId]                 = useState<string | null>(null)
@@ -140,16 +173,26 @@ export function ChatPage() {
     if (runId) api.cancelRun(runId).catch(console.error)
   }
 
-  const send = useCallback(async (msg: string) => {
-    if (!msg || isRunning) return
+  const send = useCallback(async (msg: string, attachments: Attachment[] = []) => {
+    if ((!msg && attachments.length === 0) || isRunning) return
     setIsRunning(true)
-    setPendingMsg(msg)
+    setPendingMsg(msg || '(image)')
+    setPendingAttachments(attachments)
     setStreamingText('')
 
     let sid = sessionId
 
     try {
-      const res = await api.startConsoleRun(msg, sid || undefined)
+      const task: string | TaskBlock[] = attachments.length > 0
+        ? [
+            ...(msg ? [{ type: 'text' as const, text: msg }] : []),
+            ...attachments.map((a) => ({
+              type: 'image' as const,
+              source: { type: 'base64' as const, media_type: a.media_type, data: a.data },
+            })),
+          ]
+        : msg
+      const res = await api.startConsoleRun(task, sid || undefined)
       if (!sid) {
         sid = res.session_id
         persistSession(sid)
@@ -158,13 +201,16 @@ export function ChatPage() {
 
       // eslint-disable-next-line prefer-const
       let stopStream: () => void = () => {}
-      stopStream = api.streamRun(res.run_id, (event) => {
-        if (event.type === 'token') {
+      stopStream = api.streamRun(res.run_id, (event: any) => {
+        if (event.type === 'warning') {
+          setStreamingText((prev) => prev + `[${event.message}]\n\n`)
+        } else if (event.type === 'token') {
           setStreamingText((prev) => prev + (event.content ?? ''))
         } else if (event.type === 'done' || event.type === 'error') {
           setIsRunning(false)
           setRunId(null)
           setPendingMsg('')
+          setPendingAttachments([])
           setStreamingText('')
           stopStream()
           api.getSessionMessages(sid!, agentId, 'web_ui', 'im-workspaces')
@@ -176,6 +222,7 @@ export function ChatPage() {
     } catch (e) {
       setIsRunning(false)
       setPendingMsg('')
+      setPendingAttachments([])
       console.error(e)
     }
   }, [isRunning, sessionId, agentId, persistSession, loadSessions])
@@ -183,7 +230,11 @@ export function ChatPage() {
   // Assemble display messages for ChatPanel
   const displayMessages: ChatMessage[] = [
     ...history.map(toLabMsg),
-    ...(pendingMsg ? [{ role: 'user' as const, content: pendingMsg }] : []),
+    ...(pendingMsg ? [{
+      role: 'user' as const,
+      content: pendingMsg,
+      ...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
+    }] : []),
     ...(isRunning || streamingText
       ? [{ role: 'assistant' as const, content: streamingText, streaming: isRunning }]
       : []),
@@ -269,7 +320,7 @@ export function ChatPage() {
           )}
 
           <ChatInput
-            onSend={(text) => send(text)}
+            onSend={(text, attachments) => send(text, attachments)}
             onNewChat={newChat}
             disabled={isRunning}
             placeholder={t('gw.chat.placeholder')}

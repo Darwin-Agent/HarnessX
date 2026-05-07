@@ -797,7 +797,8 @@ async def gateway_doc_content(path: str, lang: str = "zh") -> GwDocContent:
 
 
 class ConsoleRunRequest(BaseModel):
-    message: str
+    task: str | list | None = None  # str or Anthropic content blocks
+    message: str | None = None  # legacy text-only field
     session_id: str | None = None
 
 
@@ -812,8 +813,12 @@ async def console_run(body: ConsoleRunRequest) -> dict:
     from harnessx.api.sse_tracer import SSETracer, _sse
     from harnessx import BaseTask
 
-    if not body.message.strip():
-        raise HTTPException(status_code=400, detail="message required")
+    # Resolve task: prefer 'task' field, fall back to legacy 'message'
+    task_content = body.task if body.task is not None else body.message
+    if not task_content:
+        raise HTTPException(status_code=400, detail="task or message required")
+    if isinstance(task_content, str) and not task_content.strip():
+        raise HTTPException(status_code=400, detail="task or message required")
 
     gw_cfg = _load_raw_config().get("gateway", {})
     gw_agent_id = gw_cfg.get("agent_id", "gateway")
@@ -828,11 +833,65 @@ async def console_run(body: ConsoleRunRequest) -> dict:
             from .main import _build_harness, _load_model_config
 
             base = _build_harness({}, {}, _load_model_config(), agent_id=gw_agent_id, channel_name="web_ui")
-            sse_tracer = SSETracer(queue=queue, inner=base.config.tracer, api_run_id=run_id)
+
+            # Instantiate the journal from TracerConfig so SSETracer can delegate to it
+            from harnessx.core.config_schema import TracerConfig as _TC
+            from harnessx.tracing.journal import HarnessJournal as _HJ
+
+            _inner_tracer = None
+            if isinstance(base.config.tracer, _TC):
+                tc = base.config.tracer
+                _inner_tracer = _HJ(
+                    export_jsonl=tc.export_jsonl, silent=tc.silent,
+                    session_id=tc.session_id,
+                    **({"base_dir": tc.base_dir} if tc.base_dir else {}),
+                )
+            else:
+                _inner_tracer = base.config.tracer
+
+            sse_tracer = SSETracer(queue=queue, inner=_inner_tracer, api_run_id=run_id)
             harness_config = base.config.copy(tracer=sse_tracer)
             harness = base.model_config.agentic(harness_config)
 
-            task = BaseTask(description=body.message.strip())
+            description = task_content.strip() if isinstance(task_content, str) else task_content
+
+            # Degrade image blocks if model lacks native vision
+            if isinstance(description, list):
+                from .core.model_caps import get_input_modalities
+                import base64 as b64mod
+                import tempfile
+
+                try:
+                    model_name = base.model_config.main.model
+                except Exception:
+                    model_name = ""
+                mods = get_input_modalities(model_name)
+                if "image" not in mods:
+                    text_parts: list[str] = []
+                    for block in description:
+                        if block.get("type") == "text":
+                            text_parts.append(block["text"])
+                        elif block.get("type") == "image":
+                            src = block.get("source", {})
+                            media_type = src.get("media_type", "image/png")
+                            ext = media_type.split("/")[-1] if "/" in media_type else "png"
+                            data = src.get("data", "")
+                            if data:
+                                tmp = tempfile.NamedTemporaryFile(
+                                    prefix="webui_img_", suffix=f".{ext}", delete=False
+                                )
+                                tmp.write(b64mod.b64decode(data))
+                                tmp.close()
+                                text_parts.append(f"[image file: {tmp.name}]")
+                    n_images = sum(1 for b in description if b.get("type") == "image")
+                    if n_images:
+                        await queue.put(_sse({
+                            "type": "warning",
+                            "message": f"Current model ({model_name}) does not support native vision. {n_images} image(s) saved as files for tool-based processing.",
+                        }))
+                    description = "\n".join(text_parts) if text_parts else "[image]"
+
+            task = BaseTask(description=description)
 
             def stream_cb(delta: object) -> None:
                 kind = "token"
