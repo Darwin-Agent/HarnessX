@@ -395,6 +395,21 @@ class DingTalkChannel(BaseChannel):
                 mentioned=mentioned,
             )
 
+        # Handle reply/quote: DingTalk puts quote info in extensions or raw_data
+        reply_to_id = None
+        quote_content = (
+            (msg.extensions or {}).get("quoteContent")
+            or (raw_data.get("extensions") or {}).get("quoteContent")
+        )
+        if not quote_content:
+            # Alternative field names used by some DingTalk versions
+            quote_data = (msg.extensions or {}).get("msgReplyQuote") or raw_data.get("msgReplyQuote")
+            if isinstance(quote_data, dict):
+                quote_content = quote_data.get("quoteContent", "")
+                reply_to_id = quote_data.get("quoteMessageId")
+        if quote_content and isinstance(quote_content, str):
+            text = f'[quoted message: {quote_content.strip()[:500]}]\n\n{text}'
+
         # Register reply_future so send() can resolve it on first successful send.
         # Store (stream_loop, future, msg_id) so resolutions use call_soon_threadsafe.
         if reply_future is not None and not reply_future.done():
@@ -410,6 +425,7 @@ class DingTalkChannel(BaseChannel):
             message_id=f"{conv_id}|{msg_id}" if conv_id else msg_id,
             message_type=mtype,
             conversation=conv,
+            reply_to=reply_to_id,
             media_paths=media_paths,
             raw={"conv_id": conv_id, "sender_id": sender_id},
         )

@@ -230,6 +230,24 @@ class SlackChannel(BaseChannel):
         # Resolve display name (cached to avoid per-message API calls)
         sender_name = await self._resolve_user_name(client, user_id)
 
+        # Handle thread reply: fetch parent message text for context
+        reply_to_id = None
+        if is_thread_reply and thread_ts:
+            reply_to_id = thread_ts
+            try:
+                result = await client.conversations_replies(
+                    channel=channel_id, ts=thread_ts, limit=1, inclusive=True
+                )
+                messages = (result.get("messages") or []) if result else []
+                if messages and messages[0].get("ts") == thread_ts:
+                    parent_text = (messages[0].get("text") or "").strip()
+                    if parent_text and self._bot_id:
+                        parent_text = parent_text.replace(f"<@{self._bot_id}>", "").strip()
+                    if parent_text:
+                        text = f'[quoted message: {parent_text[:500]}]\n\n{text}'
+            except Exception as e:
+                logger.debug("[slack] failed to fetch thread parent: %s", e)
+
         event_obj = MessageEvent(
             text=text,
             sender_id=user_id,
@@ -238,6 +256,7 @@ class SlackChannel(BaseChannel):
             message_id=ts,
             message_type=mtype,
             conversation=conv,
+            reply_to=reply_to_id,
             media_paths=media_paths,
             raw={},
         )
