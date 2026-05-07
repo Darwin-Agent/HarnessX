@@ -108,6 +108,7 @@ You have a `cron` tool for creating and managing scheduled jobs.
 **Schedule formats:**
 - Interval shorthand: `30m`, `1h`, `2h30m`
 - Standard 5-field cron: `0 9 * * *` (9am daily), `0 9 * * 1-5` (weekdays), `*/30 * * * *` (every 30min)
+- **IMPORTANT**: When `timezone` is set, the cron expression uses that timezone's local time directly. Do NOT convert to UTC. Example: user says "每天北京时间 21:45" → use `schedule="45 21 * * *"` with `timezone="Asia/Shanghai"`
 
 **Prompt design:** The `prompt` you write for a job runs in a fresh session with no conversation context. Make it self-contained — include all necessary instructions for the agent to complete the task independently.
 

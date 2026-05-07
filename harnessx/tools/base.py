@@ -71,11 +71,26 @@ async def _execute_tool(t: Tool, input: dict) -> ToolResult:
         else:
             result = await asyncio.to_thread(t.fn, **input)
         if isinstance(result, ToolResult):
-            return result
-        return ToolResult(output=str(result) if result is not None else "")
+            return _truncate_result(result, t.name)
+        output = str(result) if result is not None else ""
+        return _truncate_result(ToolResult(output=output), t.name)
     except Exception as e:
         _log.debug("Tool %r raised an exception: %s", t.name, e, exc_info=True)
         return ToolResult(output="", error=str(e))
+
+
+def _truncate_result(result: ToolResult, tool_name: str) -> ToolResult:
+    """Truncate oversized tool output and save the full content to disk."""
+    from .mcp import _MCP_TEXT_THRESHOLD, _save_text
+
+    output = result.output
+    if not isinstance(output, str) or len(output) <= _MCP_TEXT_THRESHOLD:
+        return result
+    if "[truncated" in output:
+        return result
+    path = _save_text(output, tool_name=tool_name)
+    truncated = output[:_MCP_TEXT_THRESHOLD] + f"\n\n[truncated — complete output ({len(output)} chars) saved to {path}]"
+    return ToolResult(output=truncated, error=result.error, content_blocks=result.content_blocks)
 
 
 def _infer_schema(fn: Callable) -> dict:
