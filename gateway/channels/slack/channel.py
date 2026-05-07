@@ -56,6 +56,8 @@ class SlackChannel(BaseChannel):
     supports_threads = True
     supports_reactions = True
     max_message_length = 40000
+    text_debounce_s = 0.0
+    media_fallback_s = 0.0
 
     config_schema = {
         "type": "object",

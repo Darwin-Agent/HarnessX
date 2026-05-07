@@ -41,6 +41,8 @@ class DiscordChannel(BaseChannel):
     supports_threads = True
     supports_reactions = True
     max_message_length = 2000
+    text_debounce_s = 0.0
+    media_fallback_s = 0.0
     _MAX_CACHED_MESSAGE_IDS = 500
 
     config_schema = {

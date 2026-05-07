@@ -100,6 +100,8 @@ class DingTalkChannel(BaseChannel):
     supports_edit = False  # DingTalk cannot edit sent messages
     supports_reactions = True  # DingTalk supports emotion reactions
     max_message_length = 20000
+    text_debounce_s = 0.0
+    media_fallback_s = 0.0
 
     config_schema = {
         "type": "object",
@@ -277,7 +279,7 @@ class DingTalkChannel(BaseChannel):
         msg_type = getattr(msg, "msgtype", "text") or "text"
         if msg_type == "picture":
             mtype = MessageType.IMAGE
-            text = "[image]"
+            text = ""
             code = getattr(getattr(msg, "image_content", None), "download_code", None) or ""
             if code:
                 path = await self._download_resource(code, "image.jpg")

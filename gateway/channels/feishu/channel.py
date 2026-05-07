@@ -68,7 +68,7 @@ from .constants import (
 from .formatter import (
     build_text_payload_candidates,
 )
-from .utils import verify_feishu_signature, strip_mentions, extract_post_text, truncate, decrypt_feishu_payload
+from .utils import verify_feishu_signature, strip_mentions, extract_post_text, extract_post_content, truncate, decrypt_feishu_payload
 
 logger = logging.getLogger(__name__)
 
@@ -303,8 +303,12 @@ class FeishuChannel(BaseChannel):
                 if path:
                     media_paths.append(path)
         elif msg_type == MSG_TYPE_POST:
-            mtype = MessageType.TEXT
-            text = extract_post_text(body)
+            text, image_keys = extract_post_content(body)
+            for ik in image_keys:
+                path = await self._download_resource(msg.message_id, ik, "image")
+                if path:
+                    media_paths.append(path)
+            mtype = MessageType.IMAGE if media_paths else MessageType.TEXT
         else:
             text = f"[{msg_type}]"
 
