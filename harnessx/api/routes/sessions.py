@@ -74,16 +74,24 @@ def _extract_user_content(rec: dict, session_id: str) -> Any:
                 source = b.get("source", {})
                 media_ref = source.get("media_ref")
                 if media_ref:
-                    blocks.append({
-                        "type": "image",
-                        "media_url": f"/api/sessions/{session_id}/media/{media_ref.split('/')[-1]}",
-                        "media_type": source.get("media_type", "image/jpeg"),
-                    })
+                    blocks.append(
+                        {
+                            "type": "image",
+                            "media_url": f"/api/sessions/{session_id}/media/{media_ref.split('/')[-1]}",
+                            "media_type": source.get("media_type", "image/jpeg"),
+                        }
+                    )
                 elif source.get("data"):
-                    blocks.append({
-                        "type": "image",
-                        "source": {"type": "base64", "media_type": source.get("media_type", "image/png"), "data": source["data"]},
-                    })
+                    blocks.append(
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": source.get("media_type", "image/png"),
+                                "data": source["data"],
+                            },
+                        }
+                    )
         if blocks:
             return blocks
 
@@ -612,6 +620,7 @@ async def get_session_media(
         raise HTTPException(status_code=404, detail="media file not found")
 
     import mimetypes
+
     mime = mimetypes.guess_type(str(media_path))[0] or "application/octet-stream"
     return FileResponse(media_path, media_type=mime)
 

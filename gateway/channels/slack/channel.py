@@ -235,16 +235,14 @@ class SlackChannel(BaseChannel):
         if is_thread_reply and thread_ts:
             reply_to_id = thread_ts
             try:
-                result = await client.conversations_replies(
-                    channel=channel_id, ts=thread_ts, limit=1, inclusive=True
-                )
+                result = await client.conversations_replies(channel=channel_id, ts=thread_ts, limit=1, inclusive=True)
                 messages = (result.get("messages") or []) if result else []
                 if messages and messages[0].get("ts") == thread_ts:
                     parent_text = (messages[0].get("text") or "").strip()
                     if parent_text and self._bot_id:
                         parent_text = parent_text.replace(f"<@{self._bot_id}>", "").strip()
                     if parent_text:
-                        text = f'[quoted message: {parent_text[:500]}]\n\n{text}'
+                        text = f"[quoted message: {parent_text[:500]}]\n\n{text}"
             except Exception as e:
                 logger.debug("[slack] failed to fetch thread parent: %s", e)
 

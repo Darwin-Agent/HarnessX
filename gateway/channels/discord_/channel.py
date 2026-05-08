@@ -238,7 +238,7 @@ class DiscordChannel(BaseChannel):
             reply_to_id = str(ref_msg.id)
             quoted = getattr(ref_msg, "content", "") or ""
             if quoted:
-                text = f'[quoted message: {quoted.strip()[:500]}]\n\n{text}'
+                text = f"[quoted message: {quoted.strip()[:500]}]\n\n{text}"
 
         event = MessageEvent(
             text=text,

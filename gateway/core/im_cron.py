@@ -1,6 +1,7 @@
 # Copyright 2026 Darwin-Agent
 # SPDX-License-Identifier: MIT
 """IM cron tool — lets the agent create and manage scheduled jobs during conversation."""
+
 from __future__ import annotations
 
 import json
@@ -31,6 +32,7 @@ _INVISIBLE_CHARS = re.compile(r"[​-‏‪-‮⁠-⁤﻿]")
 
 def _get_cron_manager():
     from gateway.server import _cron_manager
+
     return _cron_manager
 
 
@@ -56,6 +58,7 @@ def _validate_schedule(schedule: str) -> tuple[dict, str | None]:
     if len(s_raw.split()) >= 5:
         try:
             from croniter import croniter
+
             croniter(s_raw)
         except (ValueError, KeyError) as e:
             return {}, f"Invalid cron expression '{s_raw}': {e}"
@@ -122,13 +125,16 @@ async def im_cron(
         # Job count limit
         existing_count = len([j for j in mgr.list_jobs() if j.get("enabled", True)])
         if existing_count >= _MAX_JOBS_PER_GATEWAY:
-            return json.dumps({"error": f"Maximum job limit ({_MAX_JOBS_PER_GATEWAY}) reached. Delete or pause existing jobs first."})
+            return json.dumps(
+                {"error": f"Maximum job limit ({_MAX_JOBS_PER_GATEWAY}) reached. Delete or pause existing jobs first."}
+            )
 
         spec: dict = {"name": name, "prompt": prompt}
         spec.update(sched_spec)
         if timezone:
             try:
                 import pytz
+
                 pytz.timezone(timezone)
             except Exception:
                 return json.dumps({"error": f"Invalid timezone '{timezone}'"})
@@ -147,21 +153,25 @@ async def im_cron(
             spec["session_id"] = f"cron:{name.lower().replace(' ', '_')[:20]}"
 
         job = mgr.create_job(spec)
-        return json.dumps({"ok": True, "id": job.id, "name": job.name, "message": f"Job '{job.name}' created successfully."})
+        return json.dumps(
+            {"ok": True, "id": job.id, "name": job.name, "message": f"Job '{job.name}' created successfully."}
+        )
 
     elif action == "list":
         jobs = mgr.list_jobs()
         summary = []
         for j in jobs:
-            summary.append({
-                "id": j["id"],
-                "name": j["name"],
-                "enabled": j["enabled"],
-                "schedule": j.get("cron") or j.get("every") or "",
-                "prompt": j["prompt"][:60] + ("..." if len(j["prompt"]) > 60 else ""),
-                "next_run": j.get("state", {}).get("next_run_at"),
-                "last_status": j.get("state", {}).get("last_status"),
-            })
+            summary.append(
+                {
+                    "id": j["id"],
+                    "name": j["name"],
+                    "enabled": j["enabled"],
+                    "schedule": j.get("cron") or j.get("every") or "",
+                    "prompt": j["prompt"][:60] + ("..." if len(j["prompt"]) > 60 else ""),
+                    "next_run": j.get("state", {}).get("next_run_at"),
+                    "last_status": j.get("state", {}).get("last_status"),
+                }
+            )
         return json.dumps({"jobs": summary, "count": len(summary)})
 
     elif action == "get":
@@ -205,4 +215,6 @@ async def im_cron(
         return json.dumps({"ok": True, "message": f"Job '{job_id}' triggered."})
 
     else:
-        return json.dumps({"error": f"Unknown action '{action}'. Valid: create, list, get, pause, resume, delete, run_now"})
+        return json.dumps(
+            {"error": f"Unknown action '{action}'. Valid: create, list, get, pause, resume, delete, run_now"}
+        )

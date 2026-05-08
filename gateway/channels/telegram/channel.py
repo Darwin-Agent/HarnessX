@@ -193,7 +193,7 @@ class TelegramChannel(BaseChannel):
             reply_to_id = str(msg.reply_to_message.message_id)
             quoted = msg.reply_to_message.text or msg.reply_to_message.caption or ""
             if quoted:
-                text = f'[quoted message: {quoted.strip()[:500]}]\n\n{text}'
+                text = f"[quoted message: {quoted.strip()[:500]}]\n\n{text}"
 
         event = MessageEvent(
             text=text,

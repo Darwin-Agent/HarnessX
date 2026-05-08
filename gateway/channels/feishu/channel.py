@@ -69,7 +69,7 @@ from .constants import (
 from .formatter import (
     build_text_payload_candidates,
 )
-from .utils import verify_feishu_signature, strip_mentions, extract_post_text, extract_post_content, truncate, decrypt_feishu_payload
+from .utils import verify_feishu_signature, strip_mentions, extract_post_content, truncate, decrypt_feishu_payload
 
 logger = logging.getLogger(__name__)
 
@@ -361,7 +361,7 @@ class FeishuChannel(BaseChannel):
         if parent_id and self._client:
             quoted_text = await self._fetch_quoted_text(parent_id)
             if quoted_text:
-                text = f'[quoted message: {quoted_text.strip()[:500]}]\n\n{text}'
+                text = f"[quoted message: {quoted_text.strip()[:500]}]\n\n{text}"
 
         event = MessageEvent(
             text=text,
@@ -433,6 +433,7 @@ class FeishuChannel(BaseChannel):
                 return content.get("text", "")
             elif msg_type == "post":
                 from .utils import extract_post_text
+
                 return extract_post_text(content)
             else:
                 return content.get("text", str(content)[:200])

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, AsyncIterator, Callable, Iterable
 from ...core.events import Message, TaskEndEvent
 from ...core.processor import MultiHookProcessor
 
+
 def _content_as_text(content) -> str:
     if isinstance(content, str):
         return content

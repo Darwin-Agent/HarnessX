@@ -842,7 +842,8 @@ async def console_run(body: ConsoleRunRequest) -> dict:
             if isinstance(base.config.tracer, _TC):
                 tc = base.config.tracer
                 _inner_tracer = _HJ(
-                    export_jsonl=tc.export_jsonl, silent=tc.silent,
+                    export_jsonl=tc.export_jsonl,
+                    silent=tc.silent,
                     session_id=tc.session_id,
                     **({"base_dir": tc.base_dir} if tc.base_dir else {}),
                 )
@@ -877,18 +878,20 @@ async def console_run(body: ConsoleRunRequest) -> dict:
                             ext = media_type.split("/")[-1] if "/" in media_type else "png"
                             data = src.get("data", "")
                             if data:
-                                tmp = tempfile.NamedTemporaryFile(
-                                    prefix="webui_img_", suffix=f".{ext}", delete=False
-                                )
+                                tmp = tempfile.NamedTemporaryFile(prefix="webui_img_", suffix=f".{ext}", delete=False)
                                 tmp.write(b64mod.b64decode(data))
                                 tmp.close()
                                 text_parts.append(f"[image file: {tmp.name}]")
                     n_images = sum(1 for b in description if b.get("type") == "image")
                     if n_images:
-                        await queue.put(_sse({
-                            "type": "warning",
-                            "message": f"Current model ({model_name}) does not support native vision. {n_images} image(s) saved as files for tool-based processing.",
-                        }))
+                        await queue.put(
+                            _sse(
+                                {
+                                    "type": "warning",
+                                    "message": f"Current model ({model_name}) does not support native vision. {n_images} image(s) saved as files for tool-based processing.",
+                                }
+                            )
+                        )
                     description = "\n".join(text_parts) if text_parts else "[image]"
 
             task = BaseTask(description=description)

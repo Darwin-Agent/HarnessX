@@ -254,9 +254,7 @@ class BaseChannel(ABC):
             loop = asyncio.get_running_loop()
             handle = loop.call_later(
                 self.media_fallback_s,
-                lambda cid=chat_id, e=event: self._schedule_task(
-                    self._flush_media_only(cid, e)
-                ),
+                lambda cid=chat_id, e=event: self._schedule_task(self._flush_media_only(cid, e)),
             )
             self._pending_media[chat_id] = (paths, handle)
             logger.info("[%s] media buffered chat_id=%r paths=%d", self.name, chat_id, len(paths))
@@ -288,9 +286,7 @@ class BaseChannel(ABC):
         loop = asyncio.get_running_loop()
         handle = loop.call_later(
             self.text_debounce_s,
-            lambda e=event, cid=chat_id: self._schedule_task(
-                self._flush_pending(cid, e)
-            ),
+            lambda e=event, cid=chat_id: self._schedule_task(self._flush_pending(cid, e)),
         )
         self._pending[chat_id] = (event, handle)
         logger.info("[%s] text debounce scheduled chat_id=%r delay=%.3fs", self.name, chat_id, self.text_debounce_s)

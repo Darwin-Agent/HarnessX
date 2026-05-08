@@ -89,7 +89,9 @@ def _truncate_result(result: ToolResult, tool_name: str) -> ToolResult:
     if "[truncated" in output:
         return result
     path = _save_text(output, tool_name=tool_name)
-    truncated = output[:_MCP_TEXT_THRESHOLD] + f"\n\n[truncated — complete output ({len(output)} chars) saved to {path}]"
+    truncated = (
+        output[:_MCP_TEXT_THRESHOLD] + f"\n\n[truncated — complete output ({len(output)} chars) saved to {path}]"
+    )
     return ToolResult(output=truncated, error=result.error, content_blocks=result.content_blocks)
 
 
