@@ -54,7 +54,7 @@ def _extract_user_text(rec: dict) -> str:
     return (content or task).strip()
 
 
-def _extract_user_content(rec: dict, session_id: str) -> Any:
+def _extract_user_content(rec: dict, session_id: str, media_query: str = "") -> Any:
     """Return full content (str or list with media URLs) for a user message."""
     msg = rec.get("message") or {}
     content = msg.get("content", "")
@@ -74,10 +74,11 @@ def _extract_user_content(rec: dict, session_id: str) -> Any:
                 source = b.get("source", {})
                 media_ref = source.get("media_ref")
                 if media_ref:
+                    qs = f"?{media_query}" if media_query else ""
                     blocks.append(
                         {
                             "type": "image",
-                            "media_url": f"/api/sessions/{session_id}/media/{media_ref.split('/')[-1]}",
+                            "media_url": f"/api/sessions/{session_id}/media/{media_ref.split('/')[-1]}{qs}",
                             "media_type": source.get("media_type", "image/jpeg"),
                         }
                     )
@@ -296,7 +297,7 @@ def _list_sessions_in_dir(
     return results
 
 
-def _read_display_messages(sessions_dir: Path, session_id: str) -> list[dict]:
+def _read_display_messages(sessions_dir: Path, session_id: str, media_query: str = "") -> list[dict]:
     """Reconstruct full conversation across all segments for read-only display.
 
     Handles both legacy format (type: user/assistant/tool) and the new two-track
@@ -431,7 +432,7 @@ def _read_display_messages(sessions_dir: Path, session_id: str) -> list[dict]:
             user_type = "raw_user" if has_raw else "user"
             if t == user_type:
                 flush_assistant()
-                content = _extract_user_content(rec, session_id)
+                content = _extract_user_content(rec, session_id, media_query=media_query)
                 if content:
                     entry: dict = {
                         "role": "user",
@@ -592,7 +593,10 @@ async def get_session_messages(
     if not (sessions_dir / f"{session_id}.json").exists():
         raise HTTPException(status_code=404, detail="session not found")
 
-    msgs = _read_display_messages(sessions_dir, session_id)
+    from urllib.parse import urlencode
+
+    media_query = urlencode({"agent_id": agent_id, "project": project, "workspace_base": workspace_base})
+    msgs = _read_display_messages(sessions_dir, session_id, media_query=media_query)
     return SessionMessagesResponse(
         session_id=session_id,
         messages=[DisplayMessage(**m) for m in msgs],
