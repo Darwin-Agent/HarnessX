@@ -781,11 +781,17 @@ export const useRunsStore = create<RunsState>((set, get) => ({
               post_query_triggers:    qc.post_query_triggers ?? [],
             }
           : undefined
-        return { role: m.role as 'user' | 'system', content: m.content, query_context }
+        const content = typeof m.content === 'string' ? m.content : Array.isArray(m.content)
+          ? m.content.filter((b: any) => b?.type === 'text').map((b: any) => b.text ?? '').join('\n')
+          : String(m.content ?? '')
+        return { role: m.role as 'user' | 'system', content, query_context }
       }
       // assistant — build blocks
       const blocks: MessageBlock[] = []
-      if (m.content) blocks.push({ type: 'text', content: m.content })
+      const aContent = typeof m.content === 'string' ? m.content : Array.isArray(m.content)
+        ? m.content.filter((b: any) => b?.type === 'text').map((b: any) => b.text ?? '').join('\n')
+        : String(m.content ?? '')
+      if (aContent) blocks.push({ type: 'text', content: aContent })
       for (const tc of m.tool_calls) {
         blocks.push({ type: 'tool_use', id: tc.id, name: tc.name, input: {} })
         if (tc.output !== undefined) {
@@ -801,7 +807,7 @@ export const useRunsStore = create<RunsState>((set, get) => ({
       }
       return {
         role: 'assistant' as const,
-        content: m.content,
+        content: aContent,
         blocks,
         stepTraces: (m.step_traces?.length ?? 0) > 0 ? (m.step_traces as StepTrace[]) : undefined,
       }

@@ -57,6 +57,8 @@ class TelegramChannel(BaseChannel):
     supports_threads = True
     supports_reactions = True
     max_message_length = 4096
+    text_debounce_s = 0.0
+    media_fallback_s = 0.0
 
     config_schema = {
         "type": "object",
@@ -70,6 +72,8 @@ class TelegramChannel(BaseChannel):
         },
     }
 
+    _MEDIA_GROUP_WAIT_S = 0.8
+
     def __init__(self, config: dict, dispatcher) -> None:
         super().__init__(config, dispatcher)
         self._app: Application | None = None
@@ -77,6 +81,7 @@ class TelegramChannel(BaseChannel):
         _media_dir_cfg = config.get("_workspace_media_dir")
         self._media_cache = Path(_media_dir_cfg) if _media_dir_cfg else get_media_cache_dir()
         self._reaction_msg_cache: dict[str, int] = {}  # message_id → chat_id
+        self._media_groups: dict[str, tuple[MessageEvent, asyncio.TimerHandle]] = {}
 
     async def _connect(self) -> None:
         self._app = Application.builder().token(self.config["bot_token"]).build()
@@ -182,6 +187,14 @@ class TelegramChannel(BaseChannel):
                 mentioned=bot_mentioned,
             )
 
+        # Handle reply/quote: extract quoted message text
+        reply_to_id = None
+        if msg.reply_to_message:
+            reply_to_id = str(msg.reply_to_message.message_id)
+            quoted = msg.reply_to_message.text or msg.reply_to_message.caption or ""
+            if quoted:
+                text = f"[quoted message: {quoted.strip()[:500]}]\n\n{text}"
+
         event = MessageEvent(
             text=text,
             sender_id=sender_id,
@@ -190,6 +203,7 @@ class TelegramChannel(BaseChannel):
             message_id=str(msg.message_id),
             message_type=mtype,
             conversation=conv,
+            reply_to=reply_to_id,
             media_paths=media_paths,
             raw={},
         )
@@ -198,7 +212,41 @@ class TelegramChannel(BaseChannel):
         if len(self._reaction_msg_cache) > 500:
             oldest = next(iter(self._reaction_msg_cache))
             del self._reaction_msg_cache[oldest]
+
+        # Media group (album) handling: accumulate photos with same media_group_id
+        media_group_id = getattr(msg, "media_group_id", None)
+        if media_group_id and media_paths:
+            if media_group_id in self._media_groups:
+                prev_event, handle = self._media_groups[media_group_id]
+                handle.cancel()
+                prev_event.media_paths.extend(media_paths)
+                if text and text not in ("[image]", "[video]") and not prev_event.text:
+                    prev_event.text = text
+                event = prev_event
+            loop = asyncio.get_running_loop()
+            handle = loop.call_later(
+                self._MEDIA_GROUP_WAIT_S,
+                lambda mgid=media_group_id: self._flush_media_group(mgid),
+            )
+            self._media_groups[media_group_id] = (event, handle)
+            return
+
         await self._enqueue(event)
+
+    def _flush_media_group(self, media_group_id: str) -> None:
+        entry = self._media_groups.pop(media_group_id, None)
+        if entry is None:
+            return
+        event, _ = entry
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(self._enqueue(event))
+        task.add_done_callback(
+            lambda t: (
+                logger.error("[telegram] media group flush failed: %s", t.exception())
+                if not t.cancelled() and t.exception()
+                else None
+            )
+        )
 
     def _bot_mentioned(self, msg) -> bool:
         entities = list(msg.entities or []) + list(msg.caption_entities or [])

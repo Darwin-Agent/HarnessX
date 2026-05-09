@@ -10,9 +10,16 @@ import { useT } from '@gw/i18n'
 
 type Tab = 'status' | 'config' | 'sessions'
 
+function contentToString(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) return content.filter((b: any) => b?.type === 'text').map((b: any) => b.text ?? '').join('\n')
+  return String(content ?? '')
+}
+
 function toMsg(msg: SessionDisplayMessage): ChatMessage {
+  const text = contentToString(msg.content)
   if (msg.role !== 'assistant' || !msg.tool_calls?.length) {
-    return { role: msg.role, content: msg.content, stepTraces: msg.step_traces, query_context: msg.query_context }
+    return { role: msg.role, content: text, stepTraces: msg.step_traces, query_context: msg.query_context }
   }
   const blocks: MessageBlock[] = []
   for (const tc of msg.tool_calls) {
@@ -21,8 +28,8 @@ function toMsg(msg: SessionDisplayMessage): ChatMessage {
       blocks.push({ type: 'tool_result', id: tc.id, name: tc.name, output: tc.output, error: null, duration_ms: 0 })
     }
   }
-  if (msg.content) blocks.push({ type: 'text', content: msg.content })
-  return { role: msg.role, content: msg.content, blocks, stepTraces: msg.step_traces, query_context: msg.query_context }
+  if (text) blocks.push({ type: 'text', content: text })
+  return { role: msg.role, content: text, blocks, stepTraces: msg.step_traces, query_context: msg.query_context }
 }
 
 const STATE_COLORS: Record<string, string> = {

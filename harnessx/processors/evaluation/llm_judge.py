@@ -13,6 +13,17 @@ from typing import TYPE_CHECKING, AsyncIterator, Callable, Iterable
 from ...core.events import Message, TaskEndEvent
 from ...core.processor import MultiHookProcessor
 
+
+def _content_as_text(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"
+        )
+    return str(content) if content else ""
+
+
 _FINAL_ANSWER_RE = re.compile(r"(?:final\s+answer)\s*[:：]\s*(.+)", re.IGNORECASE | re.DOTALL)
 _ANSWER_IS_RE = re.compile(
     r"(?:^|\n)\s*(?:#{1,3}\s*)?(?:the\s+)?answer\s*(?:is)?\s*[:：]\s*(.+)",
@@ -44,7 +55,7 @@ def default_answer_extractor(messages: "Iterable[Message]") -> str:
     for msg in reversed(msg_list):
         if msg.role != "assistant" or not msg.content:
             continue
-        content = msg.content if isinstance(msg.content, str) else str(msg.content)
+        content = _content_as_text(msg.content)
         m = _FINAL_ANSWER_RE.search(content)
         if m:
             return _strip_markdown(m.group(1).strip().split("\n")[0].strip())
@@ -52,7 +63,7 @@ def default_answer_extractor(messages: "Iterable[Message]") -> str:
     for msg in reversed(msg_list):
         if msg.role != "assistant" or not msg.content:
             continue
-        content = msg.content if isinstance(msg.content, str) else str(msg.content)
+        content = _content_as_text(msg.content)
         m = _ANSWER_IS_RE.search(content)
         if m:
             return _strip_markdown(m.group(1).strip().split("\n")[0].strip())
@@ -60,7 +71,7 @@ def default_answer_extractor(messages: "Iterable[Message]") -> str:
     for msg in reversed(msg_list):
         if msg.role != "assistant" or not msg.content:
             continue
-        content = msg.content if isinstance(msg.content, str) else str(msg.content)
+        content = _content_as_text(msg.content)
         lines = [ln.strip() for ln in content.strip().splitlines() if ln.strip()]
         if lines:
             return _strip_markdown(lines[-1])
@@ -114,7 +125,7 @@ def render_trajectory_summary(
     for msg in reversed(msg_list):
         if msg.role != "assistant" or not msg.content:
             continue
-        content = msg.content if isinstance(msg.content, str) else str(msg.content)
+        content = _content_as_text(msg.content)
         reasoning_parts.insert(0, content)
         if sum(len(p) for p in reasoning_parts) >= remaining:
             break
@@ -448,7 +459,7 @@ class LLMJudgeProcessor(MultiHookProcessor):
             content = m.get("content") if isinstance(m, dict) else getattr(m, "content", "")
             if role == "tool":
                 step += 1
-                content_str = content if isinstance(content, str) else str(content)
+                content_str = _content_as_text(content)
                 tool_name = (m.get("name") if isinstance(m, dict) else getattr(m, "name", "")) or "tool"
                 tool_trace.append(
                     (
@@ -475,7 +486,7 @@ class LLMJudgeProcessor(MultiHookProcessor):
                 messages=messages,
                 tools=[],
             )
-            return (response.content or "") if isinstance(response.content, str) else str(response.content)
+            return _content_as_text(response.content)
 
         for attempt in range(2):
             try:

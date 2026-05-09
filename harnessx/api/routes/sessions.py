@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
@@ -47,9 +49,54 @@ def _extract_user_text(rec: dict) -> str:
     msg = rec.get("message") or {}
     content = msg.get("content", "")
     if isinstance(content, list):
-        content = " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+        content = " ".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
     task = rec.get("task") or ""
     return (content or task).strip()
+
+
+def _extract_user_content(rec: dict, session_id: str, media_query: str = "") -> Any:
+    """Return full content (str or list with media URLs) for a user message."""
+    msg = rec.get("message") or {}
+    content = msg.get("content", "")
+    task = rec.get("task") or ""
+
+    if isinstance(content, str):
+        return (content or task).strip()
+
+    if isinstance(content, list):
+        blocks = []
+        for b in content:
+            if not isinstance(b, dict):
+                continue
+            if b.get("type") == "text":
+                blocks.append(b)
+            elif b.get("type") == "image":
+                source = b.get("source", {})
+                media_ref = source.get("media_ref")
+                if media_ref:
+                    qs = f"?{media_query}" if media_query else ""
+                    blocks.append(
+                        {
+                            "type": "image",
+                            "media_url": f"/api/sessions/{session_id}/media/{media_ref.split('/')[-1]}{qs}",
+                            "media_type": source.get("media_type", "image/jpeg"),
+                        }
+                    )
+                elif source.get("data"):
+                    blocks.append(
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": source.get("media_type", "image/png"),
+                                "data": source["data"],
+                            },
+                        }
+                    )
+        if blocks:
+            return blocks
+
+    return (str(content) if content else task).strip() or ""
 
 
 def _read_first_query(session_dir: Path, run_ids: list[str]) -> str:
@@ -250,7 +297,7 @@ def _list_sessions_in_dir(
     return results
 
 
-def _read_display_messages(sessions_dir: Path, session_id: str) -> list[dict]:
+def _read_display_messages(sessions_dir: Path, session_id: str, media_query: str = "") -> list[dict]:
     """Reconstruct full conversation across all segments for read-only display.
 
     Handles both legacy format (type: user/assistant/tool) and the new two-track
@@ -385,11 +432,11 @@ def _read_display_messages(sessions_dir: Path, session_id: str) -> list[dict]:
             user_type = "raw_user" if has_raw else "user"
             if t == user_type:
                 flush_assistant()
-                text = _extract_user_text(rec)
-                if text:
+                content = _extract_user_content(rec, session_id, media_query=media_query)
+                if content:
                     entry: dict = {
                         "role": "user",
-                        "content": text,
+                        "content": content,
                         "tool_calls": [],
                         "step_traces": [],
                         "query_context": pending_query_ctx,
@@ -473,7 +520,7 @@ class SessionListResponse(BaseModel):
 
 class DisplayMessage(BaseModel):
     role: str
-    content: str
+    content: Any  # str or list (Anthropic content blocks for multimodal)
     tool_calls: list[dict] = []
     step_traces: list[dict] = []  # StepTrace-shaped dicts (assistant messages only)
     query_context: Optional[dict] = None  # QueryContext-shaped dict (user messages only)
@@ -546,11 +593,40 @@ async def get_session_messages(
     if not (sessions_dir / f"{session_id}.json").exists():
         raise HTTPException(status_code=404, detail="session not found")
 
-    msgs = _read_display_messages(sessions_dir, session_id)
+    from urllib.parse import urlencode
+
+    media_query = urlencode({"agent_id": agent_id, "project": project, "workspace_base": workspace_base})
+    msgs = _read_display_messages(sessions_dir, session_id, media_query=media_query)
     return SessionMessagesResponse(
         session_id=session_id,
         messages=[DisplayMessage(**m) for m in msgs],
     )
+
+
+@router.get("/sessions/{session_id}/media/{filename}")
+async def get_session_media(
+    session_id: str,
+    filename: str,
+    agent_id: Optional[str] = Query(None),
+    project: Optional[str] = Query(None),
+    workspace_base: str = Query("workspaces"),
+):
+    """Serve a media file from a session's media directory."""
+    from fastapi.responses import FileResponse
+    from harnessx.home import default_agent_id, default_project
+
+    agent_id = agent_id or default_agent_id()
+    project = project or default_project()
+    sessions_dir = _sessions_dir(agent_id, project, workspace_base=workspace_base)
+    media_path = sessions_dir / session_id / "media" / filename
+
+    if not media_path.exists() or not media_path.is_file():
+        raise HTTPException(status_code=404, detail="media file not found")
+
+    import mimetypes
+
+    mime = mimetypes.guess_type(str(media_path))[0] or "application/octet-stream"
+    return FileResponse(media_path, media_type=mime)
 
 
 @router.delete("/sessions/{session_id}")

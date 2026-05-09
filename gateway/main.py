@@ -176,9 +176,11 @@ def _build_harness(
         # then add the IM-only im_send_file tool so agents can push files back to users.
         from harnessx.tools.builtin import build_default_tools
         from .core.im_send_file import im_send_file as _im_send_file_tool
+        from .core.im_cron import im_cron as _im_cron_tool
 
         _tool_registry = build_default_tools()
         _tool_registry.register(_im_send_file_tool)
+        _tool_registry.register(_im_cron_tool)
         harness_config = harness_config.copy(tool_registry=_tool_registry)
 
         harness_config = harness_config.copy(tracer=TracerConfig(base_dir=str(sessions_dir), silent=True))

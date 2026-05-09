@@ -28,6 +28,7 @@ _VIDEO_PATTERNS = re.compile(
 
 # Maximum file size to embed inline as base64.
 # Larger files are passed as file paths (for tool use).
+IMAGE_EMBED_MAX_BYTES = 3_500_000  # ~3.5 MB raw (Anthropic limit is 5 MB base64)
 AUDIO_EMBED_MAX_BYTES = 1 * 1024 * 1024  # 1 MB
 VIDEO_EMBED_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -38,7 +39,7 @@ VIDEO_EMBED_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 _CAP_TO_MODS: dict[str, set[str]] = {
     "asr": {"audio"},
     "omni": {"audio", "video"},
-    "vl": set(),  # image only; IMAGE is always handled separately
+    "vl": {"image"},
 }
 
 # Simple TTL cache: avoids re-reading YAML on every message
@@ -111,7 +112,7 @@ def get_input_modalities(model_name: str) -> frozenset[str]:
     Always includes "text". Maps capabilities:
       asr  → audio
       omni → audio + video
-      vl   → (image; handled separately by IMAGE message type)
+      vl   → image
     """
     mods: set[str] = {"text"}
 
@@ -124,6 +125,8 @@ def get_input_modalities(model_name: str) -> frozenset[str]:
         return frozenset(mods)
 
     # Fallback: regex heuristics
+    # Most modern models support vision; default to enabled
+    mods.add("image")
     if _AUDIO_PATTERNS.search(model_name):
         mods.add("audio")
     if _VIDEO_PATTERNS.search(model_name):

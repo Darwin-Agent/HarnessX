@@ -14,6 +14,7 @@ try:
         CreateMessageRequestBody,
         UpdateMessageRequest,
         UpdateMessageRequestBody,
+        GetMessageRequest,
         GetMessageResourceRequest,
         ReplyMessageRequest,
         ReplyMessageRequestBody,
@@ -68,7 +69,7 @@ from .constants import (
 from .formatter import (
     build_text_payload_candidates,
 )
-from .utils import verify_feishu_signature, strip_mentions, extract_post_text, truncate, decrypt_feishu_payload
+from .utils import verify_feishu_signature, strip_mentions, extract_post_content, truncate, decrypt_feishu_payload
 
 logger = logging.getLogger(__name__)
 
@@ -303,8 +304,12 @@ class FeishuChannel(BaseChannel):
                 if path:
                     media_paths.append(path)
         elif msg_type == MSG_TYPE_POST:
-            mtype = MessageType.TEXT
-            text = extract_post_text(body)
+            text, image_keys = extract_post_content(body)
+            for ik in image_keys:
+                path = await self._download_resource(msg.message_id, ik, "image")
+                if path:
+                    media_paths.append(path)
+            mtype = MessageType.IMAGE if media_paths else MessageType.TEXT
         else:
             text = f"[{msg_type}]"
 
@@ -351,6 +356,13 @@ class FeishuChannel(BaseChannel):
         if feishu_thread_id:
             raw["feishu_thread_id"] = feishu_thread_id
 
+        # Handle reply/quote: fetch the quoted message content
+        parent_id = getattr(msg, "parent_id", None) or None
+        if parent_id and self._client:
+            quoted_text = await self._fetch_quoted_text(parent_id)
+            if quoted_text:
+                text = f"[quoted message: {quoted_text.strip()[:500]}]\n\n{text}"
+
         event = MessageEvent(
             text=text,
             sender_id=open_id,
@@ -359,6 +371,7 @@ class FeishuChannel(BaseChannel):
             message_id=msg.message_id or "",
             message_type=mtype,
             conversation=conv,
+            reply_to=parent_id,
             media_paths=media_paths,
             raw=raw,
         )
@@ -401,6 +414,31 @@ class FeishuChannel(BaseChannel):
             return str(path)
         except Exception as e:
             logger.error("[feishu] download error: %s", e)
+            return None
+
+    async def _fetch_quoted_text(self, message_id: str) -> str | None:
+        """Fetch the text content of a message by ID (for reply/quote context)."""
+        try:
+            req = GetMessageRequest.builder().message_id(message_id).build()
+            resp = await asyncio.to_thread(self._client.im.v1.message.get, req)
+            if not resp.success() or not resp.data or not resp.data.items:
+                return None
+            parent_msg = resp.data.items[0]
+            body = getattr(parent_msg, "body", None)
+            if not body or not body.content:
+                return None
+            content = json.loads(body.content)
+            msg_type = getattr(parent_msg, "msg_type", "text")
+            if msg_type == "text":
+                return content.get("text", "")
+            elif msg_type == "post":
+                from .utils import extract_post_text
+
+                return extract_post_text(content)
+            else:
+                return content.get("text", str(content)[:200])
+        except Exception as e:
+            logger.debug("[feishu] _fetch_quoted_text failed for %s: %s", message_id, e)
             return None
 
     # ── Webhook entry point ───────────────────────────────────────────────
@@ -451,6 +489,7 @@ class FeishuChannel(BaseChannel):
         _chat_id = msg_data.get("chat_id", "")
         _chat_type = msg_data.get("chat_type", "p2p")
         _thread_id = msg_data.get("thread_id", None)
+        _parent_id = msg_data.get("parent_id", None)
         _content = msg_data.get("content", "{}")
 
         class _Msg:
@@ -459,6 +498,7 @@ class FeishuChannel(BaseChannel):
             chat_id = _chat_id
             chat_type = _chat_type
             thread_id = _thread_id
+            parent_id = _parent_id
             content = _content
             mentions = _mentions
 

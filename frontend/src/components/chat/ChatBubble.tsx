@@ -390,7 +390,7 @@ export function ChatBubble({ message }: Props) {
                   {message.attachments.map((att, i) => (
                     <img
                       key={i}
-                      src={`data:${att.media_type};base64,${att.data}`}
+                      src={att.url || `data:${att.media_type};base64,${att.data}`}
                       alt={att.name ?? 'image'}
                       className="rounded-xl object-contain"
                       style={{ maxWidth: 240, maxHeight: 200, border: '1px solid var(--border)' }}

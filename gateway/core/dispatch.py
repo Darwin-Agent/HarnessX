@@ -23,6 +23,7 @@ _im_channel_var: ContextVar[BaseChannel | None] = ContextVar("im_channel", defau
 _im_event_var: ContextVar[MessageEvent | None] = ContextVar("im_event", default=None)
 _im_session_id_var: ContextVar[str | None] = ContextVar("im_session_id", default=None)
 _im_confirm_registry_var: ContextVar[dict | None] = ContextVar("im_confirm_registry", default=None)
+_im_is_cron_var: ContextVar[bool] = ContextVar("im_is_cron", default=False)
 
 
 QUEUE_MAXSIZE = 100
@@ -798,26 +799,39 @@ class ChannelDispatcher:
 
         match event.message_type:
             case MessageType.IMAGE if event.media_paths:
-                # Multimodal: content blocks
-                blocks: list[dict] = []
-                for path in event.media_paths:
-                    try:
-                        with open(path, "rb") as f:
-                            data = base64.standard_b64encode(f.read()).decode()
-                        mime = mimetypes.guess_type(path)[0] or "image/jpeg"
-                        blocks.append(
-                            {
-                                "type": "image",
-                                "source": {"type": "base64", "media_type": mime, "data": data},
-                            }
-                        )
-                    except Exception:
-                        pass
-                if event.text and event.text not in ("[image]", ""):
-                    blocks.append({"type": "text", "text": event.text})
-                elif not blocks:
-                    return event.text or "[image]"
-                return blocks if blocks else event.text
+                caption = event.text if event.text and event.text not in ("[image]", "") else ""
+                if "image" in modalities:
+                    from .model_caps import IMAGE_EMBED_MAX_BYTES
+
+                    blocks: list[dict] = []
+                    fallback_paths: list[str] = []
+                    for path in event.media_paths:
+                        try:
+                            if os.path.getsize(path) <= IMAGE_EMBED_MAX_BYTES:
+                                with open(path, "rb") as f:
+                                    data = base64.standard_b64encode(f.read()).decode()
+                                mime = mimetypes.guess_type(path)[0] or "image/jpeg"
+                                blocks.append(
+                                    {
+                                        "type": "image",
+                                        "source": {"type": "base64", "media_type": mime, "data": data},
+                                    }
+                                )
+                            else:
+                                fallback_paths.append(path)
+                        except Exception:
+                            fallback_paths.append(path)
+                    if fallback_paths:
+                        blocks.append({"type": "text", "text": "\n".join(f"[image file: {p}]" for p in fallback_paths)})
+                    if caption:
+                        blocks.append({"type": "text", "text": caption})
+                    if blocks:
+                        return blocks
+                # Fallback: model has no vision or all images failed
+                parts = [f"[image file: {p}]" for p in event.media_paths]
+                if caption:
+                    parts.append(caption)
+                return "\n".join(parts) if parts else event.text or "[image]"
 
             case MessageType.VOICE if event.media_paths:
                 path = event.media_paths[0]
@@ -944,9 +958,19 @@ class ChannelDispatcher:
         full_session_id = f"{channel_name}:{session_id}" if channel_name else session_id
 
         task = BaseTask(description=prompt)
-        result = await harness.run(task, session_id=full_session_id)
+
+        tok_cron = _im_is_cron_var.set(True)
+        try:
+            result = await harness.run(task, session_id=full_session_id)
+        finally:
+            _im_is_cron_var.reset(tok_cron)
 
         output = result.final_output or ""
+
+        # [SILENT] sentinel: suppress delivery for monitoring jobs with nothing to report
+        if output.strip().upper().startswith("[SILENT]"):
+            logger.debug("[cron] output suppressed by [SILENT] sentinel for session=%s", full_session_id)
+            return output
 
         if channel_name and chat_id and output:
             channel = self._channels.get(channel_name)

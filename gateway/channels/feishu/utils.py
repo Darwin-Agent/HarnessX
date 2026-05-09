@@ -65,7 +65,25 @@ def strip_mentions(text: str) -> str:
 
 def extract_post_text(rich_text_content: dict) -> str:
     """Extract plain text from feishu post (rich text) message."""
+    text, _ = extract_post_content(rich_text_content)
+    return text
+
+
+def extract_post_content(rich_text_content: dict) -> tuple[str, list[str]]:
+    """Extract text and image keys from feishu post (rich text) message.
+
+    Returns (text, image_keys).
+    Handles both flat format {"content": [...]} and language-wrapped {"zh_cn": {"content": [...]}}.
+    """
+    # Unwrap language key if present (e.g. {"zh_cn": {"title": ..., "content": [...]}})
+    if "content" not in rich_text_content:
+        for v in rich_text_content.values():
+            if isinstance(v, dict) and "content" in v:
+                rich_text_content = v
+                break
+
     lines: list[str] = []
+    image_keys: list[str] = []
     for elements in rich_text_content.get("content", []):
         parts: list[str] = []
         for elem in elements:
@@ -77,9 +95,11 @@ def extract_post_text(rich_text_content: dict) -> str:
             elif tag == "at":
                 parts.append(f"@{elem.get('user_name') or elem.get('user_id', '')}")
             elif tag == "img":
-                parts.append("[image]")
+                key = elem.get("image_key", "")
+                if key:
+                    image_keys.append(key)
         lines.append("".join(parts))
-    return "\n".join(lines)
+    return "\n".join(lines), image_keys
 
 
 def truncate(text: str, max_len: int = FEISHU_MAX_TEXT_LEN) -> str:

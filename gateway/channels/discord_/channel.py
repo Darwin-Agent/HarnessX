@@ -41,6 +41,8 @@ class DiscordChannel(BaseChannel):
     supports_threads = True
     supports_reactions = True
     max_message_length = 2000
+    text_debounce_s = 0.0
+    media_fallback_s = 0.0
     _MAX_CACHED_MESSAGE_IDS = 500
 
     config_schema = {
@@ -229,6 +231,15 @@ class DiscordChannel(BaseChannel):
                     mentioned=mentioned,
                 )
 
+        # Handle reply/quote: extract referenced message text
+        reply_to_id = None
+        if message.reference and message.reference.resolved:
+            ref_msg = message.reference.resolved
+            reply_to_id = str(ref_msg.id)
+            quoted = getattr(ref_msg, "content", "") or ""
+            if quoted:
+                text = f"[quoted message: {quoted.strip()[:500]}]\n\n{text}"
+
         event = MessageEvent(
             text=text,
             sender_id=str(message.author.id),
@@ -237,6 +248,7 @@ class DiscordChannel(BaseChannel):
             message_id=str(message.id),
             message_type=mtype,
             conversation=conv,
+            reply_to=reply_to_id,
             media_paths=media_paths,
             raw={},
         )

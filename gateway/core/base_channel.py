@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 _DEDUP_TTL = 600  # 10 minutes
 _DEDUP_SIZE = 2048
 _DEDUP_GC_INTERVAL = 64  # GC after every N writes
-_DEBOUNCE_S = 0.05  # 50ms merge window for fragmented messages
+_TEXT_DEBOUNCE_S = 0.7  # 700ms merge window for fragmented/rapid text
+_MEDIA_FALLBACK_S = 10.0  # flush media-only after 10s if no text follows
 
 
 class MessageType(str, Enum):
@@ -124,6 +125,10 @@ class BaseChannel(ABC):
     supports_threads: bool = False  # can create / reply in threads
     max_message_length: int = 4096
 
+    # ── Debounce configuration (overridable per channel) ───────────────────
+    text_debounce_s: float = _TEXT_DEBOUNCE_S
+    media_fallback_s: float = _MEDIA_FALLBACK_S
+
     def __init__(self, config: dict, dispatcher: "ChannelDispatcher") -> None:
         self.config = config
         self._dispatcher = dispatcher
@@ -135,6 +140,7 @@ class BaseChannel(ABC):
         self._dedup_last_flush = time.time()
         self._last_message_ts: float = time.time()
         self._pending: dict[str, tuple[MessageEvent, asyncio.TimerHandle]] = {}
+        self._pending_media: dict[str, tuple[list[str], asyncio.TimerHandle | None]] = {}
         self._load_dedup_store()
 
     # ── Persistent dedup ────────────────────────────────────────────────────
@@ -230,8 +236,41 @@ class BaseChannel(ABC):
             return
         self._last_message_ts = time.time()
 
-        # Debounce: merge fragmented messages from the same chat within DEBOUNCE_S
         chat_id = event.conversation.chat_id
+        has_media = bool(event.media_paths)
+        has_text = bool(event.text and event.text not in ("[image]", "[voice]", "[video]", ""))
+
+        # ── Layer 1: Media buffer ──────────────────────────────────────────
+        # Media without text → buffer it and wait for text to arrive.
+        if has_media and not has_text:
+            if chat_id in self._pending_media:
+                paths, old_handle = self._pending_media[chat_id]
+                if old_handle is not None:
+                    old_handle.cancel()
+                paths.extend(event.media_paths)
+            else:
+                paths = list(event.media_paths)
+
+            loop = asyncio.get_running_loop()
+            handle = loop.call_later(
+                self.media_fallback_s,
+                lambda cid=chat_id, e=event: self._schedule_task(self._flush_media_only(cid, e)),
+            )
+            self._pending_media[chat_id] = (paths, handle)
+            logger.info("[%s] media buffered chat_id=%r paths=%d", self.name, chat_id, len(paths))
+            return
+
+        # Text arrived → absorb any buffered media into this event
+        if has_text and chat_id in self._pending_media:
+            buffered_paths, media_handle = self._pending_media.pop(chat_id)
+            if media_handle is not None:
+                media_handle.cancel()
+            event.media_paths = buffered_paths + event.media_paths
+            if event.media_paths:
+                event.message_type = MessageType.IMAGE
+            logger.info("[%s] media merged into text event chat_id=%r", self.name, chat_id)
+
+        # ── Layer 2: Text debounce (0.7s) ──────────────────────────────────
         if chat_id in self._pending:
             prev_event, handle = self._pending[chat_id]
             handle.cancel()
@@ -240,29 +279,43 @@ class BaseChannel(ABC):
             elif event.text:
                 prev_event.text = event.text
             prev_event.media_paths.extend(event.media_paths)
+            if event.media_paths:
+                prev_event.message_type = MessageType.IMAGE
             event = prev_event
 
         loop = asyncio.get_running_loop()
-
-        def _schedule_flush(cid: str, e: MessageEvent) -> None:
-            logger.info("[%s] debounce timer fired, scheduling flush chat_id=%r", self.name, cid)
-            task = loop.create_task(self._flush_pending(cid, e))
-            task.add_done_callback(
-                lambda t: (
-                    logger.error("[%s] debounce flush failed: %s", self.name, t.exception())
-                    if not t.cancelled() and t.exception()
-                    else None
-                )
-            )
-
-        handle = loop.call_later(_DEBOUNCE_S, lambda e=event, cid=chat_id: _schedule_flush(cid, e))
+        handle = loop.call_later(
+            self.text_debounce_s,
+            lambda e=event, cid=chat_id: self._schedule_task(self._flush_pending(cid, e)),
+        )
         self._pending[chat_id] = (event, handle)
-        logger.info("[%s] debounce scheduled chat_id=%r delay=%.3fs", self.name, chat_id, _DEBOUNCE_S)
+        logger.info("[%s] text debounce scheduled chat_id=%r delay=%.3fs", self.name, chat_id, self.text_debounce_s)
+
+    def _schedule_task(self, coro) -> None:
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(coro)
+        task.add_done_callback(
+            lambda t: (
+                logger.error("[%s] flush failed: %s", self.name, t.exception())
+                if not t.cancelled() and t.exception()
+                else None
+            )
+        )
 
     async def _flush_pending(self, chat_id: str, event: MessageEvent) -> None:
-        logger.info("[%s] _flush_pending chat_id=%r text=%r", self.name, chat_id, event.text[:40])
+        logger.info("[%s] _flush_pending chat_id=%r text=%r", self.name, chat_id, event.text[:40] if event.text else "")
         self._pending.pop(chat_id, None)
         await self._dispatcher.enqueue(self, event)
+
+    async def _flush_media_only(self, chat_id: str, event: MessageEvent) -> None:
+        media_entry = self._pending_media.pop(chat_id, None)
+        if media_entry is None:
+            return
+        paths, _ = media_entry
+        event.media_paths = paths
+        event.message_type = MessageType.IMAGE
+        logger.info("[%s] media fallback flush chat_id=%r paths=%d", self.name, chat_id, len(paths))
+        await self._flush_pending(chat_id, event)
 
     # ── Abstract methods ────────────────────────────────────────────────────
 

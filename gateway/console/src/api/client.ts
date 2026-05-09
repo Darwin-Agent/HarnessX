@@ -129,8 +129,8 @@ const gwApi = {
   // ── Console chat (web_ui channel) ─────────────────────────────────────────
 
   /** Start a console chat run (project=web_ui). Returns { run_id, session_id }. */
-  startConsoleRun(message: string, sessionId?: string): Promise<{ run_id: string; session_id: string }> {
-    return gw_post('/console/run', { message, session_id: sessionId ?? null })
+  startConsoleRun(task: string | unknown[], sessionId?: string): Promise<{ run_id: string; session_id: string }> {
+    return gw_post('/console/run', { task, session_id: sessionId ?? null })
   },
 
   // ── Heartbeat ─────────────────────────────────────────────────────────────
