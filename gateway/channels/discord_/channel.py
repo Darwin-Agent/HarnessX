@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 class DiscordChannel(BaseChannel):
     name = "discord"
     display_name = "Discord"
-    stall_timeout = 3600.0
     stream_edit_interval = 1.5
     stream_buffer_threshold = 120
 
@@ -74,6 +73,13 @@ class DiscordChannel(BaseChannel):
         self._recent_thread_starts: dict[str, str] = {}
 
     async def _connect(self) -> None:
+        if self._client is not None:
+            try:
+                await self._client.close()
+            except Exception:
+                pass
+            self._client = None
+
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True  # needed for guild.get_member() in role mention detection

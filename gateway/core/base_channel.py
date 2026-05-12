@@ -104,10 +104,6 @@ class SendResult:
     retryable: bool = False
 
 
-class StallError(Exception):
-    pass
-
-
 class BaseChannel(ABC):
     name: str
     display_name: str
@@ -115,7 +111,6 @@ class BaseChannel(ABC):
 
     reconnect_backoff: tuple[float, ...] = (5, 10, 30, 60, 120)
     max_reconnect_attempts: int = 0
-    stall_timeout: float = 120.0
     stream_edit_interval: float = 0.8
     stream_buffer_threshold: int = 20
 
@@ -137,8 +132,6 @@ class BaseChannel(ABC):
         self._dedup_store: dict[str, float] = {}  # key → expiry ts (file-backed)
         self._dedup_writes = 0
         self._dedup_dirty = False
-        self._dedup_last_flush = time.time()
-        self._last_message_ts: float = time.time()
         self._pending: dict[str, tuple[MessageEvent, asyncio.TimerHandle]] = {}
         self._pending_media: dict[str, tuple[list[str], asyncio.TimerHandle | None]] = {}
         self._load_dedup_store()
@@ -189,12 +182,11 @@ class BaseChannel(ABC):
                 logger.info("[%s] connecting…", self.name)
                 await self._connect()
                 self.connection_state = "online"
-                self._last_message_ts = time.time()
                 logger.info("[%s] online", self.name)
                 async with asyncio.TaskGroup() as tg:
                     tg.create_task(self._listen())
                     tg.create_task(self._watchdog())
-            except* (StallError, Exception) as eg:
+            except* Exception as eg:
                 attempts += 1
                 first_exc = eg.exceptions[0]
                 if self.max_reconnect_attempts and attempts >= self.max_reconnect_attempts:
@@ -214,13 +206,9 @@ class BaseChannel(ABC):
     async def _watchdog(self) -> None:
         while True:
             await asyncio.sleep(30)
-            elapsed = time.time() - self._last_message_ts
-            if elapsed > self.stall_timeout:
-                raise StallError(f"{self.name} stalled: no messages for {elapsed:.0f}s")
             if self._dedup_dirty:
                 self._save_dedup_store()
                 self._dedup_dirty = False
-                self._dedup_last_flush = time.time()
 
     async def _enqueue(self, event: MessageEvent) -> None:
         is_dup = self.is_duplicate(event)
@@ -234,7 +222,6 @@ class BaseChannel(ABC):
         )
         if is_dup:
             return
-        self._last_message_ts = time.time()
 
         chat_id = event.conversation.chat_id
         has_media = bool(event.media_paths)

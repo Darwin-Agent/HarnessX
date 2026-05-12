@@ -48,7 +48,6 @@ _SLACK_REACTION_MAP: dict[str, str] = {
 class SlackChannel(BaseChannel):
     name = "slack"
     display_name = "Slack"
-    stall_timeout = 3600.0
     stream_edit_interval = 0.8
     stream_buffer_threshold = 20
 
@@ -111,6 +110,16 @@ class SlackChannel(BaseChannel):
         return True
 
     async def _connect(self) -> None:
+        # Close the previous handler to stop its orphaned background tasks
+        # (monitor_current_session, receive_messages) that would otherwise keep
+        # calling apps.connections.open and flood the logs with rate-limit retries.
+        if self._handler is not None:
+            try:
+                await self._handler.close_async()
+            except Exception:
+                pass
+            self._handler = None
+
         bot_token = self.config["bot_token"]
         self._bolt_app = AsyncApp(token=bot_token)
         self._client = self._bolt_app.client

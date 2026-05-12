@@ -87,6 +87,17 @@ def configure_logging(
     # Intercept all stdlib logging (including third-party libs) into loguru
     logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
 
+    # Suppress noisy third-party SDK logs unless DEBUG is requested.
+    # slack_sdk emits high-volume INFO logs for routine reconnects and rate-limit
+    # retries that are not actionable; only surface them in verbose mode.
+    _noisy_loggers = ("slack_sdk", "slack_bolt", "slack.web", "httpcore", "httpx")
+    if effective_level.upper() != "DEBUG":
+        for name in _noisy_loggers:
+            logging.getLogger(name).setLevel(logging.WARNING)
+    else:
+        for name in _noisy_loggers:
+            logging.getLogger(name).setLevel(logging.NOTSET)
+
 
 # ── Apply defaults on import ──────────────────────────────────────────────────
 configure_logging()
