@@ -77,7 +77,6 @@ logger = logging.getLogger(__name__)
 class FeishuChannel(BaseChannel):
     name = "feishu"
     display_name = "Feishu"
-    stall_timeout = 3600.0
     stream_edit_interval = 0.2
     stream_buffer_threshold = 10
 
@@ -172,6 +171,18 @@ class FeishuChannel(BaseChannel):
     # ── Connection ─────────────────────────────────────────────────────────
 
     async def _connect(self) -> None:
+        # Stop the previous WSClient's event loop to kill its orphaned background
+        # tasks (_ping_loop, _receive_message_loop, _reconnect) that would otherwise
+        # keep running in the old daemon thread after a reconnect cycle.
+        ws_loop = self._ws_loop
+        if ws_loop and not ws_loop.is_closed():
+            try:
+                ws_loop.call_soon_threadsafe(ws_loop.stop)
+            except Exception:
+                pass
+        self._ws = None
+        self._ws_loop = None
+
         app_id = self.config["app_id"]
         app_secret = self.config["app_secret"]
         self._client = (

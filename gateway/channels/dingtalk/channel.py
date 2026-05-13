@@ -93,7 +93,6 @@ _TOKEN_PREEMPTIVE_REFRESH = 300  # refresh access token 5min before expiry
 class DingTalkChannel(BaseChannel):
     name = "dingtalk"
     display_name = "DingTalk"
-    stall_timeout = 3600.0
     stream_edit_interval = 0.5
     stream_buffer_threshold = 15
 
@@ -239,6 +238,15 @@ class DingTalkChannel(BaseChannel):
     # ── Connection ─────────────────────────────────────────────────────────
 
     async def _connect(self) -> None:
+        if self._stream_client is not None:
+            ws = getattr(self._stream_client, "websocket", None)
+            if ws is not None:
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+            self._stream_client = None
+
         credential = dingtalk_stream.Credential(self.config["client_id"], self.config["client_secret"])
         self._stream_client = DingTalkStreamClient(credential)
         self._stream_client.register_callback_handler(

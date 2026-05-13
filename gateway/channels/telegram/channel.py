@@ -49,7 +49,6 @@ _TG_REACTION_MAP: dict[str, str] = {
 class TelegramChannel(BaseChannel):
     name = "telegram"
     display_name = "Telegram"
-    stall_timeout = 3600.0
     stream_edit_interval = 1.0
     stream_buffer_threshold = 30
 
@@ -84,6 +83,15 @@ class TelegramChannel(BaseChannel):
         self._media_groups: dict[str, tuple[MessageEvent, asyncio.TimerHandle]] = {}
 
     async def _connect(self) -> None:
+        if self._app is not None:
+            try:
+                await self._app.updater.stop()
+                await self._app.stop()
+                await self._app.shutdown()
+            except Exception:
+                pass
+            self._app = None
+
         self._app = Application.builder().token(self.config["bot_token"]).build()
         self._app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, self._on_message))
         for cmd in ("reset", "help", "cancel", "start", "pair"):
