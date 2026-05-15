@@ -131,9 +131,14 @@ def _load_classified_tasks(path: str, attachments_dir: str | None = None) -> dic
     with open(path, "r", encoding="utf-8") as f:
         blob = json.load(f)
 
-    questions = blob.get("questions") or blob  # support flat list too
-    if isinstance(questions, dict):
-        questions = list(questions.values())
+    if isinstance(blob, list):
+        questions = blob
+    elif isinstance(blob, dict):
+        questions = blob.get("questions") or blob
+        if isinstance(questions, dict):
+            questions = list(questions.values())
+    else:
+        raise ValueError(f"Unexpected GAIA JSON root type: {type(blob).__name__}")
 
     from benchmarks.gaia.task import GAIATask as _GT
 
@@ -185,7 +190,20 @@ async def _run_task(harness, task, label, *, pipeline_eval, harness_config=None)
     try:
         result = await harness.run(task, session_id=f"{label}-{task_id}")
         elapsed = time.time() - t0
-        eval_result = await pipeline_eval.evaluate_answer(result.final_output or "", task.final_answer or "")
+        # LLM-judge-primary eval: passes the full trajectory (most recent
+        # assistant turns) + ground truth to an LLM judge rather than relying
+        # on string-matching ``result.final_output``. The legacy string-match
+        # path misgrades tasks where the FINAL ANSWER was emitted one turn
+        # before the trajectory ended (e.g. after a CommitNudge injection)
+        # because ``final_output`` ends up empty.
+        eval_result = await pipeline_eval.evaluate_with_trace_judge(
+            task_description=task.question or task.description or "",
+            ground_truth=task.final_answer or "",
+            final_output=result.final_output or "",
+            trajectory_messages=getattr(
+                getattr(result, "task_end", None), "final_messages", (),
+            ),
+        )
         passed = bool(eval_result.passed)
         score = float(eval_result.score)
         reason = (eval_result.reason or "")[:200]

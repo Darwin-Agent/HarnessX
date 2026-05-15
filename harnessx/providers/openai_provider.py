@@ -258,8 +258,14 @@ class OpenAIProvider(BaseModelProvider):
             kwargs["tools"] = oai_tools
 
         global _last_request_time
-        max_retries = 4
-        base_delay = 3.0
+        # Gateway rate limits can pile up when many parallel tasks all hit
+        # the same provider (observed under high concurrency where the
+        # 4-retry budget saturated on every task and produced widespread
+        # error-exits in a baseline rollout). Bumping to 6 retries with a
+        # larger base gives exponential backoff enough headroom to de-sync
+        # synchronous rate-limit surges.
+        max_retries = 6
+        base_delay = 5.0
 
         if self.stream:
             return await self._complete_streaming(client, oai_messages, kwargs, max_retries, base_delay)
@@ -286,7 +292,15 @@ class OpenAIProvider(BaseModelProvider):
                 if status == 400 and ("flagged" in err_str or "content_policy" in err_str) and attempt == 1:
                     is_retryable = True
                 if is_retryable and attempt < max_retries:
-                    delay = min(base_delay * (2 ** (attempt - 1)) + (attempt * 0.5), 120.0)
+                    # Add per-attempt jitter (±50% of base) so N parallel
+                    # tasks hitting 429 simultaneously don't all retry in
+                    # lockstep and re-synchronise on the rate limit.
+                    import random as _r
+                    jitter = _r.uniform(0.5, 1.5)
+                    delay = min(
+                        (base_delay * (2 ** (attempt - 1)) + attempt * 0.5) * jitter,
+                        180.0,
+                    )
                     logger.warning(
                         "API %s (attempt %d/%d), retrying in %.1fs", status or e, attempt, max_retries, delay
                     )
@@ -314,6 +328,17 @@ class OpenAIProvider(BaseModelProvider):
         # downstream processors (e.g. SelfVerifyProcessor) treat it as a done turn.
         if not tool_calls and finish_reason == "tool_calls":
             finish_reason = "stop"
+
+        # Degenerate-response rescue: some models occasionally return a
+        # fully empty assistant message — content="", reasoning_content=None,
+        # tool_calls=[]. If
+        # we pass this back through as an assistant history message on the
+        # next turn, strict gateways reject with 400 "assistant must provide
+        # content, reasoning_content or tool_calls". Inject a single-space
+        # placeholder so the message round-trips cleanly. finish_reason is
+        # left as-is; the RunLoop's empty-end_turn retry logic still fires.
+        if not content and not thinking and not tool_calls:
+            content = " "
 
         usage = Usage(
             input_tokens=response.usage.prompt_tokens if response.usage else 0,

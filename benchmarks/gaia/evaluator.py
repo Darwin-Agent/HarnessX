@@ -255,6 +255,12 @@ class GAIAPipelineEvaluator:
         ``harness.run()`` returns. Mirrors ``evaluate()``'s logic
         (extract → normalized match → judge fallback) but takes
         raw strings instead of an event.
+
+        Kept for backward-compat + emergency fallback when no judge
+        provider is configured. Prefer ``evaluate_with_trace_judge``
+        when the full trajectory is accessible — it handles the case
+        where ``final_output`` is empty but the trajectory contains a
+        valid FINAL ANSWER on an earlier turn (e.g. post-commit-nudge).
         """
         from harnessx.core.events import Message
 
@@ -283,6 +289,122 @@ class GAIAPipelineEvaluator:
             reason=f"{'match' if passed else 'no_match'}: extracted='{agent_answer[:80]}'",
             reward=score,
         )
+
+    async def evaluate_with_trace_judge(
+        self,
+        task_description: str,
+        ground_truth: str,
+        final_output: str,
+        trajectory_messages: "Iterable[Message]",
+        *,
+        max_recent_assistant: int = 5,
+        max_chars_per_msg: int = 1500,
+    ) -> EvalResult:
+        """LLM-judge-primary evaluation over the full trajectory.
+
+        String-match over ``final_output`` was the source of a known class
+        of false negatives: when the agent's last assistant message is a
+        tool-call with empty content (or the FINAL ANSWER sentinel was
+        emitted one or two turns earlier), ``final_output`` captures an
+        empty string, the regex extractor gives up, and a task that was
+        answered correctly gets graded ``passed=False``.
+
+        This method instead sends the most recent assistant turns plus
+        the task description and ground-truth answer to an LLM judge and
+        asks whether the agent correctly arrived at the answer — with
+        semantic equivalence (``$12,000`` ≡ ``12000``, "Quincy, MA" ≡
+        "Quincy") and FINAL-ANSWER-on-earlier-turn both permissible.
+
+        Falls back to ``evaluate_answer`` only when no judge provider is
+        configured (e.g. unit tests without model access).
+        """
+        if self._judge_provider is None:
+            return await self.evaluate_answer(final_output, ground_truth)
+
+        from harnessx.core.events import Message
+
+        msgs = list(trajectory_messages or [])
+        # Pick the most recent assistant turns with non-empty content.
+        assistant_turns = [
+            m for m in msgs
+            if getattr(m, "role", None) == "assistant" and getattr(m, "content", None)
+        ]
+        recent = assistant_turns[-max_recent_assistant:]
+        # Latest first so the judge reads the commit-point first.
+        recent_rendered = "\n\n---\n\n".join(
+            (m.content or "")[:max_chars_per_msg]
+            for m in reversed(recent)
+        )
+        if not recent_rendered and final_output:
+            # Fallback: the trajectory didn't surface assistant content but
+            # ``final_output`` has something — use it as the sole excerpt.
+            recent_rendered = final_output[:max_chars_per_msg]
+
+        gt = (ground_truth or "").strip()
+        if not gt:
+            # No ground truth — degrade to the legacy judge-fallback path.
+            from harnessx.core.events import Message as _M
+            return await self._judge_fallback_raw(
+                recent_rendered or final_output or "",
+            )
+
+        if not recent_rendered:
+            return EvalResult(
+                passed=False,
+                score=0.0,
+                reason="no assistant content in trajectory (empty run?)",
+                reward=0.0,
+            )
+
+        prompt = (
+            "You are grading a tool-using agent's answer against a known "
+            "ground-truth answer for a benchmark question.\n\n"
+            f"QUESTION:\n{(task_description or '')[:1500]}\n\n"
+            f"GROUND TRUTH:\n{gt[:500]}\n\n"
+            "AGENT'S MOST RECENT ASSISTANT MESSAGES (most recent first, "
+            "separated by ---):\n"
+            f"{recent_rendered}\n\n"
+            "Did the agent correctly commit to the ground-truth answer?\n"
+            "Accept:\n"
+            "- Semantic equivalence ('$12,000' ≡ '12000', 'Quincy, MA' ≡ 'Quincy',\n"
+            "  date formats, singular/plural, trivial paraphrase).\n"
+            "- Answer anywhere in the recent messages, not only on an explicit\n"
+            "  `FINAL ANSWER:` line (the agent may have emitted it a turn or\n"
+            "  two before the trajectory ended).\n"
+            "Reject:\n"
+            "- Partial correctness (e.g. only one of two required items).\n"
+            "- A guess that happens to string-match without justification.\n"
+            "- Silence / refusal / 'unable to determine' answers.\n\n"
+            "Respond with exactly one token PASS or FAIL on the first line, "
+            "followed by one short sentence of reasoning on the second line.\n"
+            "Format:\n"
+            "PASS\n"
+            "<reason>\n"
+            "OR:\n"
+            "FAIL\n"
+            "<reason>"
+        )
+
+        try:
+            response = await self._judge_provider.complete(
+                messages=[Message(role="user", content=prompt)],
+                tools=[],
+            )
+            text = (response.content or "").strip()
+            first_tok = text.split(None, 1)[0].upper() if text else ""
+            passed = first_tok.startswith("PASS")
+            return EvalResult(
+                passed=passed,
+                score=1.0 if passed else 0.0,
+                reason=f"[trace-judge] {text[:220]}",
+                reward=1.0 if passed else 0.0,
+            )
+        except Exception as exc:
+            logger.warning(
+                "trace-judge LLM call failed (%s) — falling back to string match",
+                exc,
+            )
+            return await self.evaluate_answer(final_output, ground_truth)
 
     async def _judge_fallback_raw(self, agent_answer: str) -> EvalResult:
         if self._judge_provider is None:

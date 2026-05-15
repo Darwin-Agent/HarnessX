@@ -141,15 +141,23 @@ def make_gaia_harness(
 
 # ── GAIA-specific system prompt (used by GPT-5 / QwQ-32B presets) ────────────
 
-_GAIA_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "prompts", "gaia_agent.j2")
+_GAIA_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "prompts", "gaia_agent.md")
 _GPT5_TEMPLATE_PATH = _GAIA_TEMPLATE_PATH
 
 
 def _gaia_system_builder():
     if os.path.exists(_GAIA_TEMPLATE_PATH):
-        from harnessx.processors.context.strategies.system_prompt.template import TemplateSystemPromptBuilder
+        # v0.9.2: GAIA prompt is plain markdown — NOT a Jinja template.
+        # Evolver-shipped prompt candidates are treated as pure prose so
+        # literals like `{{cite tweet}}` (Wikipedia template syntax) pass
+        # through unchanged. Root cause of the R3 crash in
+        # aegis_64_v091_r15_v2 was TemplateSystemPromptBuilder Jinja-rendering
+        # such a literal and failing with TemplateSyntaxError on every task.
+        from harnessx.processors.context.strategies.system_prompt.plain_markdown import (
+            PlainMarkdownSystemPromptBuilder,
+        )
 
-        return TemplateSystemPromptBuilder(_GAIA_TEMPLATE_PATH)
+        return PlainMarkdownSystemPromptBuilder(_GAIA_TEMPLATE_PATH)
     return _system_builder
 
 
