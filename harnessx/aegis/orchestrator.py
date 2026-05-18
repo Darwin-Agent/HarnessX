@@ -22,6 +22,83 @@ from .stages.commit import run_stage_4
 #   from harnessx.aegis.stages.adjudicate import adjudicate_previous_round
 
 
+class ShipNotLandedError(RuntimeError):
+    """Raised when commit shipped candidates but compose produced a merged
+    config byte-equivalent to the round's base — i.e. the ship had no effect.
+
+    This is a hard error rather than a warning because a silent no-op gets
+    mistaken for evolution variance: the next round runs the previous
+    round's config under a fresh hash and any pass-rate delta looks like
+    candidate impact when in fact the candidate never landed.
+    """
+
+
+def _strip_volatile_keys(cfg: dict) -> dict:
+    """Drop fields that legitimately differ across rounds (paths, ids).
+
+    Used by the ship-landed assertion to compare *semantic* config content
+    only — base_dir, session_id, etc. are expected to bump every round.
+    """
+    import copy as _copy
+    out = _copy.deepcopy(cfg)
+    tracer = out.get("tracer")
+    if isinstance(tracer, dict):
+        tracer.pop("base_dir", None)
+        tracer.pop("session_id", None)
+    return out
+
+
+def _extract_predicted_tasks(fm: dict | None) -> list[str]:
+    """Union of every ``predicted_impact.tasks_will_*`` field a manifest may
+    declare, deduped while preserving first-seen order.
+
+    Accepts both the legacy ``tasks_will_pass`` field and the granular
+    ``tasks_will_unlock`` / ``tasks_will_stabilize`` fields introduced when
+    the scoreboard became k-aware. The legacy field is the union of the
+    two granular ones; reading all three and deduping produces the right
+    set whether the Evolver populated the new fields, the old one, or
+    both.
+    """
+    pi = (fm or {}).get("predicted_impact")
+    if not isinstance(pi, dict):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for key in ("tasks_will_unlock", "tasks_will_stabilize", "tasks_will_pass"):
+        vals = pi.get(key) or []
+        if not isinstance(vals, list):
+            continue
+        for x in vals:
+            s = str(x)
+            if s and s not in seen:
+                seen.add(s)
+                out.append(s)
+    return out
+
+
+def _assert_merged_differs_from_base(
+    *, base_path: Path, merged_path: Path, shipped_cids: list[str],
+) -> None:
+    """Guarantee a non-empty ship actually mutated the merged config.
+
+    Compares semantic content (volatile keys stripped). If equal, a bucket
+    applier silently no-op'd and the round would run the parent's config
+    while pretending to validate a new candidate.
+    """
+    import yaml as _yaml
+    base = _yaml.safe_load(base_path.read_text(encoding="utf-8")) or {}
+    merged = _yaml.safe_load(merged_path.read_text(encoding="utf-8")) or {}
+    if _strip_volatile_keys(base) == _strip_volatile_keys(merged):
+        raise ShipNotLandedError(
+            f"compose produced merged.yaml semantically equal to base for "
+            f"shipped_cids={shipped_cids}. Most likely cause: a candidate's "
+            f"`bucket` field is a list but was stringified before reaching "
+            f"compose, so the bucket applier dispatch missed. Check "
+            f"orchestrator's shipped_entries construction. "
+            f"base={base_path} merged={merged_path}"
+        )
+
+
 @dataclass
 class AegisOrchestrator:
     run_dir: Path
@@ -135,6 +212,21 @@ class AegisOrchestrator:
             import logging
             logging.getLogger("aegis.orchestrator").warning(
                 "ship_outcomes backfill failed (non-fatal): %s", exc
+            )
+
+        # Compute regression watchlist BEFORE Stage P digester runs so the
+        # round_dir/regressions.md exists by the time Planner/Evolver/Critic
+        # are dispatched. Mechanical, k-aware, joint-attribution; surfaces
+        # AP→AF / AP→PP / PARTIAL→worse transitions that ship_outcomes'
+        # hit_rate metric does not penalise (it counts predicted-task
+        # improvements only).
+        try:
+            from .data.regressions import write_regressions_md
+            write_regressions_md(self.run_dir, round_n)
+        except Exception as exc:
+            import logging
+            logging.getLogger("aegis.orchestrator").warning(
+                "regressions watchlist write failed (non-fatal): %s", exc
             )
 
         # v0.9: backfill scoreboard's per-ship flipped_in_ship_round from the
@@ -500,12 +592,7 @@ class AegisOrchestrator:
         from .data.scoreboard import ShipRecord
         for scid in shipped_cids:
             fm = manifests_by_cid.get(scid) or {}
-            predicted: list[str] = []
-            pi = fm.get("predicted_impact")
-            if isinstance(pi, dict):
-                ptp = pi.get("tasks_will_pass") or []
-                if isinstance(ptp, list):
-                    predicted = [str(x) for x in ptp]
+            predicted = _extract_predicted_tasks(fm)
             self.scoreboard.add_ship(ShipRecord(
                 cid=scid,
                 round=round_n,
@@ -521,15 +608,13 @@ class AegisOrchestrator:
                 if scid not in manifests_by_cid:
                     continue
                 shipped_fm = manifests_by_cid[scid]
-                predicted = []
-                pi = shipped_fm.get("predicted_impact")
-                if isinstance(pi, dict):
-                    ptp = pi.get("tasks_will_pass") or []
-                    if isinstance(ptp, list):
-                        predicted = [str(x) for x in ptp]
+                predicted = _extract_predicted_tasks(shipped_fm)
                 rejected_siblings = [
                     c for c in candidates_info if c not in shipped_set
                 ]
+                attr_sig = shipped_fm.get("attribution_signature")
+                if not isinstance(attr_sig, dict):
+                    attr_sig = None
                 ledger.record_ship_outcome(
                     self.run_dir,
                     round_n=round_n,
@@ -538,6 +623,8 @@ class AegisOrchestrator:
                     predicted_tasks=predicted,
                     rejected_sibling_cids=rejected_siblings,
                     signature=stage_4.get("candidate_signatures", {}).get(scid, ""),
+                    attribution_signature=attr_sig,
+                    candidate_manifest=shipped_fm,
                 )
 
             # v0.9.5: mark any iterates_from targets as superseded by the new ship.
@@ -571,12 +658,7 @@ class AegisOrchestrator:
                     idx = decision_body.find(cid)
                     start = max(0, idx - 40)
                     excerpt = decision_body[start:start + 400]
-                predicted = []
-                pi = fm.get("predicted_impact")
-                if isinstance(pi, dict):
-                    ptp = pi.get("tasks_will_pass") or []
-                    if isinstance(ptp, list):
-                        predicted = [str(x) for x in ptp]
+                predicted = _extract_predicted_tasks(fm)
                 rejected_rows.append({
                     "candidate_id": cid,
                     "bucket": str(fm.get("bucket", "")),
@@ -615,11 +697,9 @@ class AegisOrchestrator:
         predicted_by_cid: dict[str, list[str]] = {}
         for scid in shipped_cids:
             fm = manifests_by_cid.get(scid, {})
-            pi = fm.get("predicted_impact") if isinstance(fm, dict) else None
-            if isinstance(pi, dict):
-                ptp = pi.get("tasks_will_pass") or []
-                if isinstance(ptp, list):
-                    predicted_by_cid[scid] = [str(x) for x in ptp]
+            preds = _extract_predicted_tasks(fm)
+            if preds:
+                predicted_by_cid[scid] = preds
         flat_predicted = [t for cid_preds in predicted_by_cid.values() for t in cid_preds]
 
         # Compose the merged next-round base config from all shipped
@@ -628,26 +708,40 @@ class AegisOrchestrator:
         # overlaid onto the round's base.
         merged_applied_path: Path | None = None
         if shipped_cids:
-            try:
-                from .compose import compose_shipped_configs
-                shipped_entries: list[tuple[str, str, Path]] = []
-                for scid in shipped_cids:
-                    fm = manifests_by_cid.get(scid, {})
-                    bucket = str((fm or {}).get("bucket", ""))
-                    applied_path = round_dir / "applied" / scid / "config.yaml"
-                    if applied_path.exists() and bucket:
-                        shipped_entries.append((scid, bucket, applied_path))
-                if shipped_entries:
-                    merged_applied_path = round_dir / "applied" / "merged.yaml"
-                    compose_shipped_configs(
-                        base_config_path=current_config_path,
-                        shipped=shipped_entries,
-                        output_path=merged_applied_path,
-                    )
-            except Exception as exc:
-                import logging
-                logging.getLogger("aegis.orchestrator").warning(
-                    "compose_shipped_configs failed (non-fatal): %s", exc
+            from .compose import compose_shipped_configs
+            shipped_entries: list[tuple[str, str | list[str], Path]] = []
+            for scid in shipped_cids:
+                fm = manifests_by_cid.get(scid, {})
+                raw_bucket = (fm or {}).get("bucket", "")
+                # Preserve list[str] for cross-bucket bundles (e.g.
+                # bucket: [prompt, processor]). Earlier code coerced via
+                # str(), which turned a list into "['prompt', 'processor']"
+                # — a non-existent bucket name that compose silently
+                # skipped, leaving merged.yaml ≡ base.
+                if isinstance(raw_bucket, list):
+                    bucket: str | list[str] = [str(b) for b in raw_bucket if b]
+                else:
+                    bucket = str(raw_bucket or "").strip()
+                applied_path = round_dir / "applied" / scid / "config.yaml"
+                if applied_path.exists() and bucket:
+                    shipped_entries.append((scid, bucket, applied_path))
+            if shipped_entries:
+                merged_applied_path = round_dir / "applied" / "merged.yaml"
+                compose_shipped_configs(
+                    base_config_path=current_config_path,
+                    shipped=shipped_entries,
+                    output_path=merged_applied_path,
+                )
+                # Hard safety: a successful ship MUST mutate the config.
+                # If merged ≡ base after compose, an applier silently
+                # no-op'd (e.g. unknown bucket name). Refuse to proceed
+                # so the round runs on a config that actually reflects
+                # the ship, instead of repeating the parent and being
+                # mistaken for variance.
+                _assert_merged_differs_from_base(
+                    base_path=current_config_path,
+                    merged_path=merged_applied_path,
+                    shipped_cids=shipped_cids,
                 )
 
         narrative = (

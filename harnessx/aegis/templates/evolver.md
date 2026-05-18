@@ -177,12 +177,22 @@ provides the equivalent smoke check for prompt diffs.
 - Per-task digests: `{{ digests_dir }}`
 - Raw trajectories: `{{ trajectories_dir }}`
 - Parent HarnessConfig: `{{ current_config_path }}`
+- **Regression watchlist (required reading when non-empty)**: read
+  the round's `regressions.md` next to `landscape.md`. If it lists any
+  regressed task, you MUST either (a) include at least one candidate
+  that addresses the regression — typically by iterating from the
+  joint-suspect ship's prompt or config — OR (b) state in a manifest's
+  body section called `## Why this regression is acceptable` why the
+  regression is transient / out-of-scope / already handled by another
+  candidate this round. Critic verifies in portfolio_audit and rejects
+  the round if neither path is taken.
 - Run root — INDEX.md catalogs cross-round ledgers + prior rounds.
   Particularly useful: `data/rejected_candidates.jsonl` (why past ideas
   in your area got rejected), `data/ship_outcomes.json` (did past ships'
   predictions hold up?), `data/task_history.jsonl` (long-term stuck tasks).
 
-No required reading list. Pull what supports your candidates.
+No required reading list beyond the regression watchlist. Pull what
+supports your candidates.
 
 ## Where to write
 
@@ -217,8 +227,34 @@ file_changes:
     action: <create|modify|delete>
     diff_summary: "<one line>"
 predicted_impact:
-  tasks_will_pass: [<task_ids you predict will flip fail→pass>]
-  tasks_at_risk:   [<task_ids you think might regress>]
+  # Declare WHICH transition each predicted task will make. The scoreboard
+  # credits grades separately, so a stabilization (PARTIAL_PASS → ALL_PASS,
+  # the canonical k>=2 evolve win) is not scored as 0 just because the
+  # task already had >=1 passing rollout before the ship.
+  #
+  # Use the digester's pattern label for each failing task to decide:
+  tasks_will_unlock:    [<currently ALL_FAIL → expect >=1 rollout to pass>]
+  tasks_will_stabilize: [<currently PARTIAL_PASS → expect all rollouts to pass>]
+  tasks_at_risk:        [<currently >=1 pass → might regress>]
+  # Legacy field, still accepted as the union of will_unlock + will_stabilize.
+  # Prefer the granular fields above when the digester gives you the pre-state.
+  tasks_will_pass:      [<task_ids you predict will improve>]
+attribution_signature:
+  # Optional but STRONGLY RECOMMENDED for tools / processor / config
+  # candidates. The scoreboard uses this to decide whether your candidate
+  # mechanically fired on each predicted task — distinguishing a real
+  # contribution from same-round prompt changes that happen to move the
+  # task. Without this, a tools/processor candidate gets only "joint"
+  # credit (shared with concurrent prompt ships) and the Critic cannot
+  # see whether your tool was actually adopted.
+  #
+  # type: tool_call          → check trajectory tool_call_counts for tool_name
+  # type: processor_invocation → check trajectory body for class_name
+  # (omit the field entirely for prompt or pure-config candidates — they
+  # have no mechanical fingerprint and will be labelled "joint")
+  type: tool_call
+  tool_name: <PascalCase tool name as registered, e.g. SmartFetch>
+  expected_min_calls: 1
 ---
 
 ## Failure Evidence

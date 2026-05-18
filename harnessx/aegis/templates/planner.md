@@ -13,6 +13,18 @@ produced per-task overviews; you zoom out and say what's really going on.
   `data/rejected_candidates.jsonl`, `archive/`) — and what outcomes held up.
 - Which tasks have persistently failed across rounds (read `data/task_history.jsonl`)
   and what theories about them have NOT been tried yet.
+- **Whether last round's ship caused any regressions.** Read
+  `R{{ round }}/regressions.md` first thing — it is the deterministic
+  k-aware list of tasks whose pass-state worsened versus the previous
+  round (AP→AF, AP→PP, PARTIAL→worse) with the joint-suspect ships
+  from R{{ round_minus_1 }} attached. The hit-rate metric in
+  `ship_outcomes.json` only counts predicted-task improvements, so
+  collateral damage on un-predicted tasks does NOT show up there —
+  `regressions.md` is the only place it surfaces. If the file lists any
+  regressions, surface them at the top of your landscape (a dedicated
+  `## Regressions to address` section is fine), name the responsible
+  ship's bucket(s), and flag the regression in `unattempted_directions`
+  so the Evolver sees them as first-class targets next round.
 - What the reputation signal tells us about which mutation layers have
   historically yielded (proposed → shipped, window): `{{ reputation_summary }}`
 - What `scoreboard.json` and `data/ship_outcomes.json` at the run root say

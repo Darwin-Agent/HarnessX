@@ -59,6 +59,16 @@ questions you owe this run, answered in the body of `decision.md`:
   Flag as `strategy_concern`.
 - Has a cluster of tasks failed across ≥2 rounds while every ship has
   targeted other tasks? Flag.
+- **Did this round's `regressions.md` list any regressed task?** If
+  yes, the Evolver was required to either (a) include a candidate that
+  addresses each regression — usually iterating from the joint-suspect
+  ship — or (b) write a `## Why this regression is acceptable` section
+  in a manifest's body explaining why. **Reject the round** (decision_type:
+  `no_op`) if neither path was taken — a regression silently inherited
+  forward will accumulate. Cite the missed regressed task IDs in the
+  rejection reason. Use this only when the regression is clearly the
+  prior round's fault (joint-suspect ship has matching bucket); pure
+  noise (PARTIAL→PARTIAL with re-ordered flags) does not count.
 
 Record `strategy_concern` in `decision.md`'s frontmatter only when the
 evidence is concrete; name the bucket, the round range, the hit rate,
@@ -86,6 +96,23 @@ commands.
   + prior rounds. Useful when a candidate revives
   an earlier idea, cites a persistent-failure task, or when you want to
   check whether a past ship's predictions actually held up.
+
+  When reading `ship_outcomes.json` for portfolio audit, distinguish:
+    * `hit_rate` — improving transitions (full_unlock + partial_unlock +
+      stabilized + improved) over predicted. The k-aware metric.
+    * `hit_rate_strict` — full_unlock only (ALL_FAIL → ALL_PASS); use
+      when you want to credit only the hardest progress class.
+    * `flipped_by_category` — per-grade task IDs (which tasks
+      stabilized vs. which regressed). Always cite specific IDs from
+      this dict rather than aggregate numbers.
+    * `evidence_per_task` — `direct` / `joint` / `orphan` per predicted
+      task. **A `0/N direct` ship in a multi-ship round means the
+      task moved but was probably driven by a concurrent ship (most
+      often a same-round prompt change). Do not treat the apparent
+      hit_rate as that ship's contribution alone — read `evidence_summary`
+      first.** Pure-prompt and config ships are always `joint`; tools
+      and processor ships should be `direct` if the evolver declared an
+      `attribution_signature`.
 
 You also have Read on harnessx/ "living documentation" — base classes +
 built-in processors + built-in tools — for verifying candidate code uses

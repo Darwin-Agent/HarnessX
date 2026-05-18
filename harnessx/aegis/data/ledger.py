@@ -159,8 +159,17 @@ def record_ship_outcome(
     predicted_tasks: list[str],
     rejected_sibling_cids: list[str],
     signature: str | None = None,
+    attribution_signature: dict | None = None,
+    candidate_manifest: dict | None = None,
 ) -> Path:
-    """Append a skeleton ship_outcome row on commit. Backfill later."""
+    """Append a skeleton ship_outcome row on commit. Backfill later.
+
+    ``attribution_signature`` (optional) is the manifest's declared
+    mechanical fingerprint used by ``backfill_ship_outcomes`` to label
+    each predicted task as direct/joint/orphan. ``candidate_manifest``
+    is stored as a fallback so the backfill can infer a default
+    signature when the Evolver did not declare one explicitly.
+    """
     path = data_dir(run_root) / _SHIP_OUTCOMES
     existing: list[dict] = []
     if path.exists():
@@ -170,6 +179,16 @@ def record_ship_outcome(
                 existing = []
         except json.JSONDecodeError:
             existing = []
+    # Persist a *minimal* slice of the manifest — file_changes is what
+    # the default-signature inferrer needs, and the bucket field is
+    # already on the outcome. We deliberately do NOT inline the whole
+    # manifest body (it can be tens of KB).
+    manifest_slice = None
+    if isinstance(candidate_manifest, dict):
+        manifest_slice = {
+            "bucket": candidate_manifest.get("bucket"),
+            "file_changes": candidate_manifest.get("file_changes") or [],
+        }
     entry = {
         "ship_id": shipped_cid,
         "round": int(round_n),
@@ -180,6 +199,10 @@ def record_ship_outcome(
         "flipped_to_pass_in_ship_round": None,  # filled by backfill
         "hit_rate": None,
         "predicted_tasks_status_latest": {},  # filled by backfill
+        "evidence_per_task": {},               # filled by backfill (attribution)
+        "evidence_summary": {},                # {direct, joint, orphan}
+        "attribution_signature": attribution_signature or None,
+        "candidate_manifest_slice": manifest_slice,
         "superseded_by": None,  # v0.9.5: set when a later iterate replaces this ship
     }
     # Replace any previous entry with same ship_id (defensive; shouldn't happen
@@ -191,16 +214,104 @@ def record_ship_outcome(
     return path
 
 
-def backfill_ship_outcomes(run_root: Path) -> Path:
-    """Re-compute flipped_to_pass / predicted_tasks_status_latest from task_history.
+def _classify_state(flags: list[bool] | None) -> str | None:
+    """Map a rollout pass-bit list to a 3-way state, k-agnostic.
 
-    Call at the END of each round's Stage P (after rollouts completed + task
-    history for this round is appended). Walks every prior ship_outcome and
+    Returns ``ALL_PASS`` / ``ALL_FAIL`` / ``PARTIAL`` (or None if no rollouts
+    recorded). For k=1, only the two extreme states are reachable (PARTIAL
+    requires k>=2 with at least one differing bit).
+    """
+    if not flags:
+        return None
+    if all(flags):
+        return "ALL_PASS"
+    if not any(flags):
+        return "ALL_FAIL"
+    return "PARTIAL"
+
+
+def _pass_rate(flags: list[bool] | None) -> float | None:
+    if not flags:
+        return None
+    return sum(flags) / len(flags)
+
+
+# Transition grades. The ship's hit/miss status is the union of "improving"
+# grades (full_unlock, partial_unlock, stabilized, improved). Regression
+# grades flag risk so the Critic can downweight a brittle ship.
+_IMPROVED_GRADES = {"full_unlock", "partial_unlock", "stabilized", "improved"}
+_REGRESSED_GRADES = {"regressed_hard", "regressed_soft", "regressed_partial"}
+
+
+def _grade_transition(prev_flags: list[bool] | None,
+                      ship_flags: list[bool] | None) -> str:
+    """Classify (prev_state, ship_state) into one of:
+
+    Improving:
+      - full_unlock     ALL_FAIL → ALL_PASS
+      - partial_unlock  ALL_FAIL → PARTIAL
+      - stabilized      PARTIAL  → ALL_PASS  (the canonical k>=2 evolve win)
+      - improved        PARTIAL  → higher PARTIAL (k>=3 only)
+
+    Regressing:
+      - regressed_hard    ALL_PASS → ALL_FAIL
+      - regressed_soft    ALL_PASS → PARTIAL
+      - regressed_partial PARTIAL  → lower PARTIAL or ALL_FAIL
+
+    Neutral:
+      - noop_pass    ALL_PASS → ALL_PASS
+      - noop_fail    ALL_FAIL → ALL_FAIL
+      - noop_partial PARTIAL  → same-rate PARTIAL
+      - unknown      pre or ship state missing
+    """
+    p = _pass_rate(prev_flags)
+    s = _pass_rate(ship_flags)
+    if p is None or s is None:
+        return "unknown"
+    if p == 0.0 and s == 1.0:
+        return "full_unlock"
+    if p == 0.0 and s > 0.0:
+        return "partial_unlock"
+    if 0.0 < p < 1.0 and s == 1.0:
+        return "stabilized"
+    if 0.0 < p < 1.0 and 0.0 < s < 1.0 and s > p:
+        return "improved"
+    if p == 1.0 and s == 0.0:
+        return "regressed_hard"
+    if p == 1.0 and 0.0 < s < 1.0:
+        return "regressed_soft"
+    if 0.0 < p < 1.0 and s < p:
+        return "regressed_partial"
+    if p == 0.0 and s == 0.0:
+        return "noop_fail"
+    if p == 1.0 and s == 1.0:
+        return "noop_pass"
+    return "noop_partial"
+
+
+def backfill_ship_outcomes(run_root: Path) -> Path:
+    """Re-compute hit metrics + status from task_history.
+
+    Called at the END of each round's Stage P (after rollouts completed +
+    task history is appended). Reads ``passed_flags`` (k-agnostic) so a
+    PARTIAL_PASS → ALL_PASS stabilization counts as a hit — the previous
+    implementation read ``passed = any(flags)`` and only credited
+    ALL_FAIL → any-pass transitions, which made k>=2 stability gains
+    invisible (every PARTIAL→ALL_PASS scored 0). For each prior ship,
     fills:
-      - flipped_to_pass_in_ship_round: tasks that were FAIL in round < ship.round
-        and PASS in round == ship.round (credit for the ship itself)
-      - predicted_tasks_status_latest: dict[task_id -> latest pass status]
-      - hit_rate: "X/Y" string for flipped_to_pass_in_ship_round / predicted
+
+      Headline (back-compat fields, redefined slightly so they describe
+      the same intent — what the ship achieved — but on the right metric):
+        - hit_rate: ``X/Y`` where X = improving transitions on predicted
+        - flipped_to_pass_in_ship_round: tasks that left ALL_FAIL
+          (full_unlock OR partial_unlock; legacy semantic preserved)
+
+      New (k-aware breakdown):
+        - hit_rate_strict: full_unlock-only count (hardest progress class)
+        - flipped_by_category: dict[grade -> list[task_id]] for every
+          predicted task, including regression and noop classes so the
+          Critic can see costs alongside gains.
+        - predicted_tasks_status_latest: enriched with PARTIAL.
     """
     path = data_dir(run_root) / _SHIP_OUTCOMES
     if not path.exists():
@@ -212,14 +323,21 @@ def backfill_ship_outcomes(run_root: Path) -> Path:
     if not isinstance(outcomes, list):
         return path
 
-    # Build per-task (round -> passed) map from task_history.
+    # Per-task (round -> list[bool]) from task_history. Prefer passed_flags
+    # (full per-rollout bits) and fall back to passed (legacy single bool)
+    # so old runs without passed_flags still backfill correctly.
     history = read_task_history(run_root)
-    per_task: dict[str, dict[int, bool]] = {}
+    per_task: dict[str, dict[int, list[bool]]] = {}
     for row in history:
         tid = row.get("task_id")
         if not tid:
             continue
-        per_task.setdefault(tid, {})[int(row.get("round", 0))] = bool(row.get("passed", False))
+        flags = row.get("passed_flags")
+        if not isinstance(flags, list) or not flags:
+            flags = [bool(row.get("passed", False))]
+        per_task.setdefault(tid, {})[int(row.get("round", 0))] = [
+            bool(b) for b in flags
+        ]
 
     max_round = max((r for bits in per_task.values() for r in bits), default=-1)
 
@@ -227,29 +345,59 @@ def backfill_ship_outcomes(run_root: Path) -> Path:
         ship_round = int(entry.get("round", 0))
         preds = entry.get("predicted_tasks", []) or []
         status_latest: dict[str, str] = {}
-        flipped: list[str] = []
+        by_category: dict[str, list[str]] = {}
+        flipped_legacy: list[str] = []  # ALL_FAIL → any-pass
+        full_unlock: list[str] = []     # ALL_FAIL → ALL_PASS only
+        improved: list[str] = []        # any improving grade
         for tid in preds:
             bits = per_task.get(tid, {})
-            # state immediately before ship (round = ship_round-1). If missing,
-            # consider it "unknown pre-state" and skip credit.
-            prev_pass = bits.get(ship_round - 1)
-            ship_pass = bits.get(ship_round)
+            prev_flags = bits.get(ship_round - 1)
+            ship_flags = bits.get(ship_round)
             latest_round = max(bits) if bits else None
-            latest_pass = bits.get(latest_round) if latest_round is not None else None
-            # Classify latest status
-            if latest_pass is True:
+            latest_flags = bits.get(latest_round) if latest_round is not None else None
+
+            latest_state = _classify_state(latest_flags)
+            if latest_state == "ALL_PASS":
                 status_latest[tid] = "passing"
-            elif latest_pass is False:
+            elif latest_state == "ALL_FAIL":
                 status_latest[tid] = "still_failing"
+            elif latest_state == "PARTIAL":
+                status_latest[tid] = "partial"
             else:
                 status_latest[tid] = "unknown"
-            # Credit the ship itself only if fail -> pass across the ship round
-            if prev_pass is False and ship_pass is True:
-                flipped.append(tid)
-        entry["flipped_to_pass_in_ship_round"] = flipped
+
+            grade = _grade_transition(prev_flags, ship_flags)
+            by_category.setdefault(grade, []).append(tid)
+            if grade in _IMPROVED_GRADES:
+                improved.append(tid)
+            if grade == "full_unlock":
+                full_unlock.append(tid)
+            if grade in ("full_unlock", "partial_unlock"):
+                flipped_legacy.append(tid)
+
+        n = len(preds)
+        entry["flipped_to_pass_in_ship_round"] = flipped_legacy
+        entry["flipped_by_category"] = by_category
         entry["predicted_tasks_status_latest"] = status_latest
-        entry["hit_rate"] = f"{len(flipped)}/{len(preds)}" if preds else "0/0"
+        entry["hit_rate"] = f"{len(improved)}/{n}" if n else "0/0"
+        entry["hit_rate_strict"] = f"{len(full_unlock)}/{n}" if n else "0/0"
         entry["latest_round_in_history"] = max_round
+
+        # Attribution: per-task direct/joint/orphan label, decoupled from
+        # the hit-rate metric so the Critic can ask "did this candidate
+        # mechanically fire on the task it claimed credit for?" without
+        # double-counting same-round bucket-disjoint ships.
+        from .attribution import compute_evidence, summarize_evidence
+        evidence = compute_evidence(
+            run_root,
+            round_n=ship_round,
+            bucket=entry.get("bucket"),
+            predicted_tasks=preds,
+            manifest=entry.get("candidate_manifest_slice"),
+            attribution_signature=entry.get("attribution_signature"),
+        )
+        entry["evidence_per_task"] = evidence
+        entry["evidence_summary"] = summarize_evidence(evidence)
 
     _write_json_atomic(path, outcomes)
     return path
@@ -463,6 +611,13 @@ def refresh_index_md(run_root: Path, current_round: int) -> Path:
         lines.append("For each round `R{n}`:")
         lines.append("- `R{n}/summary.md` — per-round overview + actionability + C2 follow-up (if any)")
         lines.append("- `R{n}/digests/*.md` — per-task failure analysis (ALL_FAIL / ALL_PASS / PARTIAL_PASS)")
+        lines.append(
+            "- `R{n}/regressions.md` — tasks whose pass-state worsened vs R{n-1}, "
+            "with joint-suspect ships from the prior round. **Required reading** "
+            "for Planner / Evolver / Critic; ship_outcomes.json's hit_rate does "
+            "not penalise regressions, so this file is the only place collateral "
+            "damage is surfaced."
+        )
         lines.append("- `R{n}/landscape.md` — Planner's cross-trace synthesis")
         lines.append("- `R{n}/candidates/C-R{n}-NN.md` — Evolver candidate manifests (K candidates, variable)")
         lines.append("- `R{n}/applied/C-R{n}-NN/` — per-candidate scratch dirs (applied config + asset files)")
