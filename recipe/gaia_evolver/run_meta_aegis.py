@@ -60,8 +60,10 @@ from benchmarks.gaia.task import GAIATask
 # Reuse helpers from the MetaAgent driver — do not duplicate.
 from recipe.gaia_evolver.run_meta import (
     _build_trajectory_text,
+    _compute_tool_counts,
     _load_classified_tasks,
     _make_provider,
+    _pick_pivotal_tool,
     _run_task,
     _score_and_gate,
     _write_task_trajectory,
@@ -594,30 +596,59 @@ async def run_pilot(args: argparse.Namespace) -> None:
                 async with sem:
                     task_i = _dc_replace(task, max_cost_usd=args.max_cost, max_steps=args.max_steps)
                     harness = model_config.agentic(round_config)
+                    # Distinct session_id per rollout — without /r{i} suffix
+                    # both k=2 rollouts share session_id="aegis/R{N}-{tid}",
+                    # the second call's HarnessJournal.wake() finds the first
+                    # rollout's saved state on disk, harness.run() takes the
+                    # resume branch (harness.py:1199), and:
+                    #   * state.max_steps = state.step + task.max_steps
+                    #     (so _r1 gets up to 2× the step budget)
+                    #   * the prior conversation messages stay in state
+                    #     (so _r1 sees _r0's attempts + tool results)
+                    # This destroys the variance-reduction intent — _r1 isn't
+                    # an independent sample, it's a continuation. For k=1 we
+                    # keep the legacy label so existing logs/parsers don't
+                    # change.
+                    label = (
+                        f"aegis/R{round_idx}"
+                        if k == 1
+                        else f"aegis/R{round_idx}/r{rollout_idx}"
+                    )
                     record = await _run_task(
                         harness,
                         task_i,
-                        f"aegis/R{round_idx}",
+                        label,
                         pipeline_eval=pipeline_eval,
                         harness_config=round_config,
                     )
                 raw = record.get("_result")
                 if raw is not None:
+                    record["pivotal_tool"] = _pick_pivotal_tool(raw)
+                    cc, ec = _compute_tool_counts(raw)
+                    record["tool_call_counts"] = cc
+                    record["tool_error_counts"] = ec
+                    record["tools_used"] = sorted(cc.keys())
                     traj_text = _build_trajectory_text(task, raw, harness_config=round_config)
                     # For k>1: write per-rollout trajectory md with _r{i} suffix
                     # so both rollouts' evidence survives for the Digester.
                     if k > 1:
                         tid = getattr(task, "task_id", "unknown")
+                        from recipe.gaia_evolver.run_meta import _render_trajectory_frontmatter
+                        fm = _render_trajectory_frontmatter(record)
                         (traj_dir / f"{tid}_r{rollout_idx}.md").write_text(
-                            traj_text, encoding="utf-8",
+                            f"{fm}\n\n{traj_text.lstrip()}", encoding="utf-8",
                         )
                     else:
                         _write_task_trajectory(traj_dir, task, traj_text, record=record)
                 results.append(record)
             return results
 
+        def _k_for(t: GAIATask) -> int:
+            focus_k = 2 if t.task_id in focus_set else 1
+            return max(args.k_all, focus_k)
+
         per_task_results = await asyncio.gather(*(
-            _run_one(t, k=2 if t.task_id in focus_set else 1)
+            _run_one(t, k=_k_for(t))
             for t in all_tasks
         ))
         # Flatten for legacy per-record consumers (stats, _flatten_sessions_to_raw).
@@ -935,6 +966,14 @@ def _build_argparser() -> argparse.ArgumentParser:
             "Adaptive k>1: up to N tasks per round (other than R0) will run "
             "TWICE instead of once. Focus set is bouncer tasks + last-ship "
             "predicted tasks. 0 disables (k=1 for all, default)."
+        ),
+    )
+    p.add_argument(
+        "--k-all", type=int, default=1,
+        help=(
+            "Floor on per-task rollouts: every task runs at least this many "
+            "times every round (R0 included). Combines with --k-focus-max "
+            "by taking the max. 2 = run all tasks twice for variance."
         ),
     )
     p.add_argument(
