@@ -28,6 +28,7 @@ built round N's config and therefore caused round N's regressions),
 with each ship's bucket — Critic uses this to decide whether to
 iterate-from a specific bucket or pivot.
 """
+
 from __future__ import annotations
 
 import json
@@ -50,8 +51,7 @@ def _pass_rate(flags: list[bool] | None) -> float | None:
     return sum(flags) / len(flags)
 
 
-def _grade(prev_flags: list[bool] | None,
-           curr_flags: list[bool] | None) -> str | None:
+def _grade(prev_flags: list[bool] | None, curr_flags: list[bool] | None) -> str | None:
     """Return the regression grade if there is one, else None."""
     p = _pass_rate(prev_flags)
     c = _pass_rate(curr_flags)
@@ -94,9 +94,7 @@ def detect_regressions(
         flags = row.get("passed_flags")
         if not isinstance(flags, list) or not flags:
             flags = [bool(row.get("passed", False))]
-        per_task.setdefault(tid, {})[int(row.get("round", 0))] = [
-            bool(b) for b in flags
-        ]
+        per_task.setdefault(tid, {})[int(row.get("round", 0))] = [bool(b) for b in flags]
 
     # Joint-suspect ships are those tagged round=N: in aegis the commit
     # event for round N produces the config that round N's task batch
@@ -112,10 +110,12 @@ def detect_regressions(
             if isinstance(outcomes, list):
                 for o in outcomes:
                     if int(o.get("round", -1)) == round_n:
-                        suspects.append({
-                            "ship_id": o.get("ship_id"),
-                            "bucket": o.get("bucket"),
-                        })
+                        suspects.append(
+                            {
+                                "ship_id": o.get("ship_id"),
+                                "bucket": o.get("bucket"),
+                            }
+                        )
         except json.JSONDecodeError:
             pass
 
@@ -126,19 +126,20 @@ def detect_regressions(
         grade = _grade(prev, curr)
         if grade is None:
             continue
-        out.append({
-            "task_id": tid,
-            "prev_state": _classify(prev),
-            "curr_state": _classify(curr),
-            "prev_flags": prev,
-            "curr_flags": curr,
-            "grade": grade,
-            "joint_suspect_ships": list(suspects),
-        })
-    out.sort(key=lambda r: ({"regressed_hard": 0,
-                              "regressed_soft": 1,
-                              "regressed_partial": 2}[r["grade"]],
-                             r["task_id"]))
+        out.append(
+            {
+                "task_id": tid,
+                "prev_state": _classify(prev),
+                "curr_state": _classify(curr),
+                "prev_flags": prev,
+                "curr_flags": curr,
+                "grade": grade,
+                "joint_suspect_ships": list(suspects),
+            }
+        )
+    out.sort(
+        key=lambda r: ({"regressed_hard": 0, "regressed_soft": 1, "regressed_partial": 2}[r["grade"]], r["task_id"])
+    )
     return out
 
 
@@ -220,6 +221,7 @@ def write_regressions_md(
         out_path = run_root / f"R{round_n}" / "regressions.md"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
-        render_regressions_md(round_n, regressions), encoding="utf-8",
+        render_regressions_md(round_n, regressions),
+        encoding="utf-8",
     )
     return out_path

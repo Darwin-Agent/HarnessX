@@ -6,15 +6,14 @@ shape — same tool called many times with different args (e.g. 75 SmartFetch
 calls iterating URLs) — slipped through, and the digester's evidence
 ground was missing the strongest behavioural signal we could extract.
 """
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-import pytest
 
 from harnessx.aegis.stages.trace_facts import (
-    ToolBurst,
     extract_trace_facts,
 )
 
@@ -29,25 +28,31 @@ def _write_traj(path: Path, calls: list[tuple[int, str, dict]]) -> None:
     for step, tool, args in calls:
         tcid = f"tc_{next_id}"
         next_id += 1
-        events.append({
-            "type": "raw_assistant",
-            "step": step,
-            "message": {
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [{"id": tcid, "name": tool, "input": args}],
-            },
-        })
-        events.append({
-            "type": "raw_tool",
-            "step": step,
-            "message": {
-                "role": "tool",
-                "tool_call_id": tcid,
-                "content": "ok",
-            },
-        })
-    events.append({"type": "episode_end", "exit_reason": "done", "total_steps": max(c[0] for c in calls) + 1, "passed": True})
+        events.append(
+            {
+                "type": "raw_assistant",
+                "step": step,
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{"id": tcid, "name": tool, "input": args}],
+                },
+            }
+        )
+        events.append(
+            {
+                "type": "raw_tool",
+                "step": step,
+                "message": {
+                    "role": "tool",
+                    "tool_call_id": tcid,
+                    "content": "ok",
+                },
+            }
+        )
+    events.append(
+        {"type": "episode_end", "exit_reason": "done", "total_steps": max(c[0] for c in calls) + 1, "passed": True}
+    )
     with path.open("w", encoding="utf-8") as f:
         for e in events:
             f.write(json.dumps(e) + "\n")
@@ -56,11 +61,14 @@ def _write_traj(path: Path, calls: list[tuple[int, str, dict]]) -> None:
 def test_no_burst_when_under_threshold(tmp_path: Path) -> None:
     """A healthy multi-tool trajectory with light per-tool counts: no burst."""
     p = tmp_path / "tid_r0.jsonl"
-    _write_traj(p, [
-        (0, "WebSearch", {"q": "x"}),
-        (1, "WebFetch", {"url": "u1"}),
-        (2, "Bash", {"cmd": "ls"}),
-    ])
+    _write_traj(
+        p,
+        [
+            (0, "WebSearch", {"q": "x"}),
+            (1, "WebFetch", {"url": "u1"}),
+            (2, "Bash", {"cmd": "ls"}),
+        ],
+    )
     facts = extract_trace_facts("tid", [p])
     assert facts.bursts == []
 

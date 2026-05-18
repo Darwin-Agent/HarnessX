@@ -22,6 +22,7 @@ Usage (CLI smoke, no LLM cost)::
 
     python -m recipe.gaia_evolver.run_meta_aegis --dry-run --smoke --run-tag test_dry
 """
+
 from __future__ import annotations
 
 import argparse
@@ -141,11 +142,7 @@ def _read_latest_commit_shipments(run_dir: Path, round_n: int) -> list[tuple[str
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if (
-                entry.get("round") == round_n
-                and entry.get("stage") == "4"
-                and entry.get("kind") == "commit"
-            ):
+            if entry.get("round") == round_n and entry.get("stage") == "4" and entry.get("kind") == "commit":
                 latest_payload = entry.get("payload") or {}
     except OSError:
         return []
@@ -184,7 +181,8 @@ def _append_rollback_reputation(run_dir: Path, buckets: list[str]) -> None:
         data[bucket] = history
     try:
         rep_path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
     except OSError as exc:
         logger.warning("failed to write rollback reputation update: %s", exc)
@@ -296,6 +294,7 @@ def _compute_focus_set(
         return set()
 
     from harnessx.aegis.data import ledger as _ledger
+
     history = _ledger.read_task_history(run_dir)
     outcomes = _ledger.read_ship_outcomes(run_dir)
 
@@ -349,9 +348,7 @@ def _compute_focus_set(
 
 
 def _save_curves(scope_dir: Path, curves: list[dict]):
-    (scope_dir / "curves.json").write_text(
-        json.dumps(curves, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    (scope_dir / "curves.json").write_text(json.dumps(curves, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _print_summary(curves: list[dict], best_idx: int, early_stopped: bool):
@@ -419,6 +416,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
         all_tasks.extend(t_list)
     if args.seed is not None:
         import random
+
         random.Random(args.seed).shuffle(all_tasks)
         logger.info("Shuffled tasks with seed=%d", args.seed)
     if args.max_tasks > 0:
@@ -427,7 +425,12 @@ async def run_pilot(args: argparse.Namespace) -> None:
         logger.error("No tasks to run (max-tasks=%d, domains loaded=%d).", args.max_tasks, len(domains))
         return
 
-    logger.info("Loaded %d tasks across %d domains; running %d", sum(len(v) for v in domains.values()), len(domains), len(all_tasks))
+    logger.info(
+        "Loaded %d tasks across %d domains; running %d",
+        sum(len(v) for v in domains.values()),
+        len(domains),
+        len(all_tasks),
+    )
 
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     run_tag = args.run_tag or f"aegis_pilot_{time.strftime('%Y%m%d_%H%M%S')}"
@@ -491,8 +494,6 @@ async def run_pilot(args: argparse.Namespace) -> None:
     curves: list[dict] = []
     noop_streak = 0
     early_stopped = False
-    # Track the path of the currently-committed config so AEGIS can diff it.
-    current_config_path: Path | None = None
     # Tracks the most recent ship so the NEXT round's rollouts can be
     # compared against the pre-ship pass rate. If the ship caused a
     # measurable regression (tighter than _score_and_gate's noise floor),
@@ -537,7 +538,8 @@ async def run_pilot(args: argparse.Namespace) -> None:
             )
         logger.info(
             "resume: loading current_config from %s (curves has %d rounds)",
-            seed_path, len(curves),
+            seed_path,
+            len(curves),
         )
         current_config = HarnessConfig.from_yaml_file(str(seed_path))
         next_evolve_status = "ok"
@@ -562,14 +564,16 @@ async def run_pilot(args: argparse.Namespace) -> None:
 
         round_config_path = round_dir / "config.yaml"
         round_config.to_yaml_file(round_config_path)
-        current_config_path = round_config_path
 
         config_hash = hashlib.sha256(round_config_path.read_bytes()).hexdigest()[:16]
 
         logger.info("\n" + "=" * 70)
         logger.info(
             "ROUND %d/%d  config=%s  evolve_status=%s",
-            round_idx, args.num_rounds - 1, config_hash, next_evolve_status,
+            round_idx,
+            args.num_rounds - 1,
+            config_hash,
+            next_evolve_status,
         )
         logger.info("=" * 70)
 
@@ -582,7 +586,8 @@ async def run_pilot(args: argparse.Namespace) -> None:
         if focus_set:
             logger.info(
                 "[R%d] k=2 focus set: %d tasks (bouncer + last-ship predicted)",
-                round_idx, len(focus_set),
+                round_idx,
+                len(focus_set),
             )
 
         # ── Run all tasks in parallel ────────────────────────────────────────
@@ -591,6 +596,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
         async def _run_one(task: GAIATask, k: int = 1) -> list[dict]:
             """Run a task k times; return k records (list always, even for k=1)."""
             from dataclasses import replace as _dc_replace
+
             results: list[dict] = []
             for rollout_idx in range(k):
                 async with sem:
@@ -609,11 +615,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
                     # an independent sample, it's a continuation. For k=1 we
                     # keep the legacy label so existing logs/parsers don't
                     # change.
-                    label = (
-                        f"aegis/R{round_idx}"
-                        if k == 1
-                        else f"aegis/R{round_idx}/r{rollout_idx}"
-                    )
+                    label = f"aegis/R{round_idx}" if k == 1 else f"aegis/R{round_idx}/r{rollout_idx}"
                     record = await _run_task(
                         harness,
                         task_i,
@@ -634,9 +636,11 @@ async def run_pilot(args: argparse.Namespace) -> None:
                     if k > 1:
                         tid = getattr(task, "task_id", "unknown")
                         from recipe.gaia_evolver.run_meta import _render_trajectory_frontmatter
+
                         fm = _render_trajectory_frontmatter(record)
                         (traj_dir / f"{tid}_r{rollout_idx}.md").write_text(
-                            f"{fm}\n\n{traj_text.lstrip()}", encoding="utf-8",
+                            f"{fm}\n\n{traj_text.lstrip()}",
+                            encoding="utf-8",
                         )
                     else:
                         _write_task_trajectory(traj_dir, task, traj_text, record=record)
@@ -647,10 +651,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
             focus_k = 2 if t.task_id in focus_set else 1
             return max(args.k_all, focus_k)
 
-        per_task_results = await asyncio.gather(*(
-            _run_one(t, k=_k_for(t))
-            for t in all_tasks
-        ))
+        per_task_results = await asyncio.gather(*(_run_one(t, k=_k_for(t)) for t in all_tasks))
         # Flatten for legacy per-record consumers (stats, _flatten_sessions_to_raw).
         records = [r for task_rolls in per_task_results for r in task_rolls]
         gc.collect()
@@ -662,22 +663,16 @@ async def run_pilot(args: argparse.Namespace) -> None:
             for r in task_rolls:
                 tid = r.get("task_id")
                 if tid:
-                    pass_flags_by_task_rd.setdefault(tid, []).append(
-                        bool(r.get("passed", False))
-                    )
+                    pass_flags_by_task_rd.setdefault(tid, []).append(bool(r.get("passed", False)))
 
         # ── Stats (per-task; k=2 rollouts aggregated via any-pass) ────────────
         # When k=1 for all tasks, passed_any == passed_all == legacy behavior.
         # When any task ran k=2, we track both "any rollout passed" (optimistic)
         # and "all rollouts passed" (strict) so noise shows up as a gap.
         n_tasks = len(per_task_results)
-        passed_any = sum(
-            1 for task_rolls in per_task_results
-            if any(r.get("passed") for r in task_rolls)
-        )
+        passed_any = sum(1 for task_rolls in per_task_results if any(r.get("passed") for r in task_rolls))
         passed_all = sum(
-            1 for task_rolls in per_task_results
-            if task_rolls and all(r.get("passed") for r in task_rolls)
+            1 for task_rolls in per_task_results if task_rolls and all(r.get("passed") for r in task_rolls)
         )
         # Legacy `passed` = passed_any (matches pre-k=2 behavior when k=1).
         passed = passed_any
@@ -694,9 +689,9 @@ async def run_pilot(args: argparse.Namespace) -> None:
         for lvl in sorted({r.get("level") for r in per_task_first if r.get("level")}):
             lrecs_first = [r for r in per_task_first if r.get("level") == lvl]
             lp = sum(
-                1 for rolls in per_task_results
-                if rolls and rolls[0].get("level") == lvl
-                and any(r.get("passed") for r in rolls)
+                1
+                for rolls in per_task_results
+                if rolls and rolls[0].get("level") == lvl and any(r.get("passed") for r in rolls)
             )
             level_stats[f"L{lvl}"] = {
                 "total": len(lrecs_first),
@@ -730,6 +725,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
         # backward compat; `passed_flags` is the full bit list and `k` is len.
         try:
             from harnessx.aegis.data import ledger as _ledger
+
             task_rows: list[dict] = []
             for task_rolls in per_task_results:
                 if not task_rolls:
@@ -741,29 +737,34 @@ async def run_pilot(args: argparse.Namespace) -> None:
                 flags = [bool(r.get("passed", False)) for r in task_rolls]
                 # For k=2, aggregate exit/steps by picking the passing rollout's
                 # trajectory info (it's the "successful shape"), else the first.
-                primary = next(
-                    (r for r in task_rolls if r.get("passed")), first
+                primary = next((r for r in task_rolls if r.get("passed")), first)
+                task_rows.append(
+                    {
+                        "round": round_idx,
+                        "task_id": tid,
+                        "level": f"L{first.get('level')}" if first.get("level") else None,
+                        "passed": any(flags),  # any-k pass (optimistic) — legacy
+                        "passed_flags": flags,  # full bit list for k>1
+                        "k": len(flags),
+                        "exit": str(primary.get("exit_reason", "") or ""),
+                        "steps": int(primary.get("steps") or 0),
+                        "cost_usd": sum(float(r.get("cost_usd") or 0.0) for r in task_rolls),
+                        "final_output_len": len(str(primary.get("final_output", "") or "")),
+                        "tools_used": list(primary.get("tools_used", []) or []),
+                    }
                 )
-                task_rows.append({
-                    "round": round_idx,
-                    "task_id": tid,
-                    "level": f"L{first.get('level')}" if first.get("level") else None,
-                    "passed": any(flags),  # any-k pass (optimistic) — legacy
-                    "passed_flags": flags,  # full bit list for k>1
-                    "k": len(flags),
-                    "exit": str(primary.get("exit_reason", "") or ""),
-                    "steps": int(primary.get("steps") or 0),
-                    "cost_usd": sum(float(r.get("cost_usd") or 0.0) for r in task_rolls),
-                    "final_output_len": len(str(primary.get("final_output", "") or "")),
-                    "tools_used": list(primary.get("tools_used", []) or []),
-                })
             _ledger.append_task_history(RUN_DIR, task_rows)
         except Exception as _exc:
             logger.warning("task_history append failed (non-fatal): %s", _exc)
 
         logger.info(
             "[R%d] pass=%d/%d (%.1f%%)  cost=$%.2f  tokens=%d",
-            round_idx, passed, n_tasks, round_pass_rate * 100, round_cost_usd, total_tokens,
+            round_idx,
+            passed,
+            n_tasks,
+            round_pass_rate * 100,
+            round_cost_usd,
+            total_tokens,
         )
         for k, v in level_stats.items():
             logger.info("  %s: %d/%d (%.1f%%)", k, v["passed"], v["total"], v["pass_rate"] * 100)
@@ -814,8 +815,11 @@ async def run_pilot(args: argparse.Namespace) -> None:
                 logger.warning(
                     "[R%d] ROLLBACK — post-ship regression Δ=%+d tasks "
                     "(%+.1fpp vs last_validated=%d); reverting ships: %s",
-                    round_idx, delta_count, delta_rate * 100,
-                    pre_passed, rolled_back_cids,
+                    round_idx,
+                    delta_count,
+                    delta_rate * 100,
+                    pre_passed,
+                    rolled_back_cids,
                 )
                 current_config = last_ship_info["pre_ship_config"]
                 _append_rollback_reputation(RUN_DIR, rolled_back_buckets)
@@ -866,7 +870,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
                 current_config=round_config_path,
                 trajectories_dir=raw_dir,
                 output_dir=next_round_dir,  # orchestrator ignores this; path
-                                             # is derived from run_dir + round_n
+                # is derived from run_dir + round_n
                 pass_flags_by_task=pass_flags_by_task,
                 round_n=round_idx + 1,
                 raw_sessions_dir=raw_dir,
@@ -888,7 +892,8 @@ async def run_pilot(args: argparse.Namespace) -> None:
                 pre_ship_rate = round_pass_rate
                 pre_ship_passed = passed
                 shipped_this_round = _read_latest_commit_shipments(
-                    RUN_DIR, round_n=round_idx + 1,
+                    RUN_DIR,
+                    round_n=round_idx + 1,
                 )
                 candidate_cfg = HarnessConfig.from_yaml_file(new_yaml_path).canonicalize()
                 current_config = candidate_cfg
@@ -902,7 +907,10 @@ async def run_pilot(args: argparse.Namespace) -> None:
 
             logger.info(
                 "[R%d] evolved config → %s  status=%s  noop_streak=%d",
-                round_idx, new_yaml, next_evolve_status, noop_streak,
+                round_idx,
+                new_yaml,
+                next_evolve_status,
+                noop_streak,
             )
 
             if noop_streak >= 2:
@@ -918,11 +926,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
 
     # ── Final summary ────────────────────────────────────────────────────────
     _save_curves(RUN_DIR, curves)
-    best_idx = (
-        max(range(len(curves)), key=lambda i: (curves[i]["passed"], -curves[i]["cost_usd"]))
-        if curves
-        else 0
-    )
+    best_idx = max(range(len(curves)), key=lambda i: (curves[i]["passed"], -curves[i]["cost_usd"])) if curves else 0
     _print_summary(curves, best_idx, early_stopped)
     logger.info("All results → %s", RUN_DIR)
 
@@ -931,9 +935,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
 
 
 def _build_argparser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        description="GAIA AEGIS Pilot: single-scope evolution using AegisAgent."
-    )
+    p = argparse.ArgumentParser(description="GAIA AEGIS Pilot: single-scope evolution using AegisAgent.")
     p.add_argument("--tasks", default=DEFAULT_DATA_PATH, help="Path to GAIA classified JSON.")
     p.add_argument("--num-rounds", type=int, default=NUM_ROUNDS)
     p.add_argument("--max-tasks", type=int, default=MAX_TASKS_DEFAULT, help="0 = all.")
@@ -948,12 +950,17 @@ def _build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--evolve-cost", type=float, default=EVOLVE_COST)
     p.add_argument("--num-evolvers", type=int, default=NUM_EVOLVERS)
     p.add_argument("--seed", type=int, default=None, help="Shuffle tasks with this seed before slicing (random pick).")
-    p.add_argument("--extended-thinking", action="store_true",
-                   help="Enable Anthropic extended thinking for meta model. Off by default — some gateways reject 'thinking.type.enabled'.")
+    p.add_argument(
+        "--extended-thinking",
+        action="store_true",
+        help="Enable Anthropic extended thinking for meta model. Off by default — some gateways reject 'thinking.type.enabled'.",
+    )
     p.add_argument("--run-tag", default=None)
     p.add_argument("--clean", action="store_true")
     p.add_argument(
-        "--start-round", type=int, default=0,
+        "--start-round",
+        type=int,
+        default=0,
         help=(
             "Resume from round N. Skips rounds 0..N-1. Requires "
             "R<N-1>/applied/merged.yaml (or R<N-1>/config.yaml) to "
@@ -961,7 +968,9 @@ def _build_argparser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--k-focus-max", type=int, default=0,
+        "--k-focus-max",
+        type=int,
+        default=0,
         help=(
             "Adaptive k>1: up to N tasks per round (other than R0) will run "
             "TWICE instead of once. Focus set is bouncer tasks + last-ship "
@@ -969,7 +978,9 @@ def _build_argparser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--k-all", type=int, default=1,
+        "--k-all",
+        type=int,
+        default=1,
         help=(
             "Floor on per-task rollouts: every task runs at least this many "
             "times every round (R0 included). Combines with --k-focus-max "

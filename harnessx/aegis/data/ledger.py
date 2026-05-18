@@ -23,6 +23,7 @@ Files written:
 Also writes ``<run_root>/INDEX.md`` — the agent's entry point. Rewritten
 at the start of each round so it always reflects current state.
 """
+
 from __future__ import annotations
 
 import json
@@ -39,6 +40,7 @@ _log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Path helpers
 # ---------------------------------------------------------------------------
+
 
 def data_dir(run_root: Path) -> Path:
     d = Path(run_root) / "data"
@@ -126,10 +128,7 @@ def append_task_history(run_root: Path, records: list[TaskRecord | dict]) -> Pat
                 "exit": str(r.get("exit", r.get("exit_reason", ""))),
                 "steps": int(r.get("steps", 0) or 0),
                 "cost_usd": float(r.get("cost_usd", 0.0) or 0.0),
-                "final_output_len": int(
-                    r.get("final_output_len",
-                          len(str(r.get("final_output", "") or ""))) or 0
-                ),
+                "final_output_len": int(r.get("final_output_len", len(str(r.get("final_output", "") or ""))) or 0),
                 "tools_used": list(r.get("tools_used", []) or []),
             }
         if not row["task_id"]:
@@ -199,8 +198,8 @@ def record_ship_outcome(
         "flipped_to_pass_in_ship_round": None,  # filled by backfill
         "hit_rate": None,
         "predicted_tasks_status_latest": {},  # filled by backfill
-        "evidence_per_task": {},               # filled by backfill (attribution)
-        "evidence_summary": {},                # {direct, joint, orphan}
+        "evidence_per_task": {},  # filled by backfill (attribution)
+        "evidence_summary": {},  # {direct, joint, orphan}
         "attribution_signature": attribution_signature or None,
         "candidate_manifest_slice": manifest_slice,
         "superseded_by": None,  # v0.9.5: set when a later iterate replaces this ship
@@ -243,8 +242,7 @@ _IMPROVED_GRADES = {"full_unlock", "partial_unlock", "stabilized", "improved"}
 _REGRESSED_GRADES = {"regressed_hard", "regressed_soft", "regressed_partial"}
 
 
-def _grade_transition(prev_flags: list[bool] | None,
-                      ship_flags: list[bool] | None) -> str:
+def _grade_transition(prev_flags: list[bool] | None, ship_flags: list[bool] | None) -> str:
     """Classify (prev_state, ship_state) into one of:
 
     Improving:
@@ -335,9 +333,7 @@ def backfill_ship_outcomes(run_root: Path) -> Path:
         flags = row.get("passed_flags")
         if not isinstance(flags, list) or not flags:
             flags = [bool(row.get("passed", False))]
-        per_task.setdefault(tid, {})[int(row.get("round", 0))] = [
-            bool(b) for b in flags
-        ]
+        per_task.setdefault(tid, {})[int(row.get("round", 0))] = [bool(b) for b in flags]
 
     max_round = max((r for bits in per_task.values() for r in bits), default=-1)
 
@@ -347,8 +343,8 @@ def backfill_ship_outcomes(run_root: Path) -> Path:
         status_latest: dict[str, str] = {}
         by_category: dict[str, list[str]] = {}
         flipped_legacy: list[str] = []  # ALL_FAIL → any-pass
-        full_unlock: list[str] = []     # ALL_FAIL → ALL_PASS only
-        improved: list[str] = []        # any improving grade
+        full_unlock: list[str] = []  # ALL_FAIL → ALL_PASS only
+        improved: list[str] = []  # any improving grade
         for tid in preds:
             bits = per_task.get(tid, {})
             prev_flags = bits.get(ship_round - 1)
@@ -388,6 +384,7 @@ def backfill_ship_outcomes(run_root: Path) -> Path:
         # mechanically fire on the task it claimed credit for?" without
         # double-counting same-round bucket-disjoint ships.
         from .attribution import compute_evidence, summarize_evidence
+
         evidence = compute_evidence(
             run_root,
             round_n=ship_round,
@@ -532,10 +529,12 @@ def backfill_rejected_revivals(run_root: Path, all_briefs_dirs: list[Path]) -> P
             r_match = re.search(r"/R(\d+)/briefs/", str(p))
             if not r_match:
                 continue
-            revivals.setdefault(archived_cid, []).append({
-                "round": int(r_match.group(1)),
-                "brief_id": p.stem,
-            })
+            revivals.setdefault(archived_cid, []).append(
+                {
+                    "round": int(r_match.group(1)),
+                    "brief_id": p.stem,
+                }
+            )
 
     changed = False
     for row in rows:
@@ -581,10 +580,7 @@ def refresh_index_md(run_root: Path, current_round: int) -> Path:
     path = run_root / _INDEX
 
     # Enumerate round dirs that exist
-    existing_rounds = sorted(
-        int(p.name[1:]) for p in run_root.glob("R[0-9]*")
-        if p.is_dir() and p.name[1:].isdigit()
-    )
+    existing_rounds = sorted(int(p.name[1:]) for p in run_root.glob("R[0-9]*") if p.is_dir() and p.name[1:].isdigit())
 
     data_exists = {
         "task_history.jsonl": (data_dir(run_root) / _TASK_HISTORY).exists(),
@@ -604,9 +600,7 @@ def refresh_index_md(run_root: Path, current_round: int) -> Path:
     lines.append("")
     lines.append("## Per-round artifacts")
     if existing_rounds:
-        lines.append(
-            f"Rounds present on disk: {', '.join('R'+str(r) for r in existing_rounds)}"
-        )
+        lines.append(f"Rounds present on disk: {', '.join('R' + str(r) for r in existing_rounds)}")
         lines.append("")
         lines.append("For each round `R{n}`:")
         lines.append("- `R{n}/summary.md` — per-round overview + actionability + C2 follow-up (if any)")

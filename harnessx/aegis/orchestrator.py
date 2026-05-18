@@ -1,6 +1,7 @@
 # Copyright 2026 Darwin-Agent
 # SPDX-License-Identifier: MIT
 """AEGIS Orchestrator — Python driver for the 6-stage loop."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from .data.archive import Archive
 from .data.reputation import Reputation
 from .data import ledger
 from .stages.preprocess import run_stage_p
-from .stages.plan import run_stage_1, BriefQuotaViolation
+from .stages.plan import run_stage_1
 from .stages.propose import run_stage_2
 from .stages.judge import run_stage_3, make_evolver_runner
 from .stages.commit import run_stage_4
@@ -40,6 +41,7 @@ def _strip_volatile_keys(cfg: dict) -> dict:
     only — base_dir, session_id, etc. are expected to bump every round.
     """
     import copy as _copy
+
     out = _copy.deepcopy(cfg)
     tracer = out.get("tracer")
     if isinstance(tracer, dict):
@@ -77,7 +79,10 @@ def _extract_predicted_tasks(fm: dict | None) -> list[str]:
 
 
 def _assert_merged_differs_from_base(
-    *, base_path: Path, merged_path: Path, shipped_cids: list[str],
+    *,
+    base_path: Path,
+    merged_path: Path,
+    shipped_cids: list[str],
 ) -> None:
     """Guarantee a non-empty ship actually mutated the merged config.
 
@@ -86,6 +91,7 @@ def _assert_merged_differs_from_base(
     while pretending to validate a new candidate.
     """
     import yaml as _yaml
+
     base = _yaml.safe_load(base_path.read_text(encoding="utf-8")) or {}
     merged = _yaml.safe_load(merged_path.read_text(encoding="utf-8")) or {}
     if _strip_volatile_keys(base) == _strip_volatile_keys(merged):
@@ -141,18 +147,19 @@ class AegisOrchestrator:
         rep_path = self.run_dir / "reputation.json"
         if rep_path.exists():
             import json as _json
+
             try:
                 self.reputation = Reputation.from_dict(
                     _json.loads(rep_path.read_text(encoding="utf-8")),
                 )
             except (_json.JSONDecodeError, KeyError, TypeError) as exc:
                 import logging
-                logging.getLogger("aegis.orchestrator").warning(
-                    "reputation.json corrupt (%s) — starting fresh", exc
-                )
+
+                logging.getLogger("aegis.orchestrator").warning("reputation.json corrupt (%s) — starting fresh", exc)
                 self.reputation = Reputation(window=5)
         # Scoreboard — v0.9 structured per-bucket / per-locus state.
         from .data.scoreboard import Scoreboard
+
         self.scoreboard = Scoreboard.load(self.run_dir / "scoreboard.json")
         # Fail loudly if no meta-agent model is wired. A None model_config
         # would silently short-circuit Digester/Planner/Evolver/Critic and
@@ -170,6 +177,7 @@ class AegisOrchestrator:
     def _persist_state(self) -> None:
         import json as _json
         import os as _os
+
         rep_path = self.run_dir / "reputation.json"
         tmp_path = rep_path.with_suffix(".json.tmp")
         tmp_path.write_text(
@@ -210,9 +218,8 @@ class AegisOrchestrator:
             ledger.backfill_ship_outcomes(self.run_dir)
         except Exception as exc:
             import logging
-            logging.getLogger("aegis.orchestrator").warning(
-                "ship_outcomes backfill failed (non-fatal): %s", exc
-            )
+
+            logging.getLogger("aegis.orchestrator").warning("ship_outcomes backfill failed (non-fatal): %s", exc)
 
         # Compute regression watchlist BEFORE Stage P digester runs so the
         # round_dir/regressions.md exists by the time Planner/Evolver/Critic
@@ -222,25 +229,25 @@ class AegisOrchestrator:
         # improvements only).
         try:
             from .data.regressions import write_regressions_md
+
             write_regressions_md(self.run_dir, round_n)
         except Exception as exc:
             import logging
-            logging.getLogger("aegis.orchestrator").warning(
-                "regressions watchlist write failed (non-fatal): %s", exc
-            )
+
+            logging.getLogger("aegis.orchestrator").warning("regressions watchlist write failed (non-fatal): %s", exc)
 
         # v0.9: backfill scoreboard's per-ship flipped_in_ship_round from the
         # same ship_outcomes ledger we just refreshed. Atomic per-record
         # rebuild (ShipRecord is frozen).
         try:
             import json as _json
+
             _outcomes_path = self.run_dir / "data" / "ship_outcomes.json"
             if _outcomes_path.exists():
                 _outcomes = _json.loads(_outcomes_path.read_text(encoding="utf-8"))
-                _by_cid = {
-                    o.get("ship_id"): o for o in _outcomes if isinstance(o, dict)
-                }
+                _by_cid = {o.get("ship_id"): o for o in _outcomes if isinstance(o, dict)}
                 from .data.scoreboard import ShipRecord
+
                 updated: list[ShipRecord] = []
                 for rec in self.scoreboard.ships:
                     o = _by_cid.get(rec.cid)
@@ -251,21 +258,28 @@ class AegisOrchestrator:
                     if not isinstance(flipped, list):
                         updated.append(rec)
                         continue
-                    updated.append(ShipRecord(
-                        cid=rec.cid, round=rec.round, bucket=rec.bucket,
-                        predicted_tasks=rec.predicted_tasks,
-                        flipped_in_ship_round=tuple(str(t) for t in flipped),
-                    ))
+                    updated.append(
+                        ShipRecord(
+                            cid=rec.cid,
+                            round=rec.round,
+                            bucket=rec.bucket,
+                            predicted_tasks=rec.predicted_tasks,
+                            flipped_in_ship_round=tuple(str(t) for t in flipped),
+                        )
+                    )
                 self.scoreboard.ships = updated
         except Exception as exc:
             import logging
+
             logging.getLogger("aegis.orchestrator").warning(
-                "scoreboard backfill failed (non-fatal): %s", exc,
+                "scoreboard backfill failed (non-fatal): %s",
+                exc,
             )
 
         # Stage P
         def digester_factory(inputs):
             from .agents.digester import build_digester_harness
+
             cfg = build_digester_harness(inputs)
             return self.model_config.agentic(cfg)
 
@@ -278,10 +292,15 @@ class AegisOrchestrator:
             harness_factory=digester_factory,
             concurrency=self.max_concurrency,
         )
-        self.audit.append(AuditEvent(
-            round=round_n, stage="P", kind="preprocess",
-            payload=stage_p, evidence_refs=[],
-        ))
+        self.audit.append(
+            AuditEvent(
+                round=round_n,
+                stage="P",
+                kind="preprocess",
+                payload=stage_p,
+                evidence_refs=[],
+            )
+        )
 
         # C2: Ship-follow-up check. If the immediately previous round shipped
         # a candidate with predicted_tasks_pass, compare those predictions
@@ -292,8 +311,7 @@ class AegisOrchestrator:
         if prev_entries and prev_entries[-1].action == "ship" and prev_entries[-1].predicted_tasks_pass:
             prev = prev_entries[-1]
             actual_pass = {
-                tid for tid, flags in (pass_flags_by_task or {}).items()
-                if flags and all(bool(f) for f in flags)
+                tid for tid, flags in (pass_flags_by_task or {}).items() if flags and all(bool(f) for f in flags)
             }
             still_failing = [t for t in prev.predicted_tasks_pass if t not in actual_pass]
             summary_path = round_dir / "summary.md"
@@ -317,17 +335,21 @@ class AegisOrchestrator:
                 with summary_path.open("a", encoding="utf-8") as fp:
                     fp.write("\n".join(lines) + "\n")
                 # Record in audit for observability
-                self.audit.append(AuditEvent(
-                    round=round_n, stage="P", kind="ship_followup",
-                    payload={
-                        "prev_round": prev.round,
-                        "prev_shipped_cid": prev.shipped_cid,
-                        "predicted_count": len(prev.predicted_tasks_pass),
-                        "still_failing_count": len(still_failing),
-                        "actually_passed_count": len(prev.predicted_tasks_pass) - len(still_failing),
-                    },
-                    evidence_refs=[],
-                ))
+                self.audit.append(
+                    AuditEvent(
+                        round=round_n,
+                        stage="P",
+                        kind="ship_followup",
+                        payload={
+                            "prev_round": prev.round,
+                            "prev_shipped_cid": prev.shipped_cid,
+                            "predicted_count": len(prev.predicted_tasks_pass),
+                            "still_failing_count": len(still_failing),
+                            "actually_passed_count": len(prev.predicted_tasks_pass) - len(still_failing),
+                        },
+                        evidence_refs=[],
+                    )
+                )
 
         # Imp 4: Early-exit when Stage P yields insufficient signal.
         actionability = float(stage_p.get("actionability", 0.0))
@@ -335,8 +357,11 @@ class AegisOrchestrator:
             reason = stage_p.get("actionability_reason", "low actionability")
             narrative = f"early_exit: {reason} (score={actionability:.2f} < {self.min_actionability:.2f})"
             self._finalize_round(
-                round_n, shipped_cids=[], hit_rate=None,
-                narrative=narrative, refuted_signatures=[],
+                round_n,
+                shipped_cids=[],
+                hit_rate=None,
+                narrative=narrative,
+                refuted_signatures=[],
             )
             return {"shipped_cid": None, "shipped_cids": [], "reason": "early_exit_no_signal"}
 
@@ -358,18 +383,24 @@ class AegisOrchestrator:
             sessions_dir=round_dir / "meta_sessions" / "planner",
         )
 
-        self.audit.append(AuditEvent(
-            round=round_n, stage="1", kind="plan",
-            payload={
-                "landscape_written": stage_1.get("landscape_written", False),
-                "frontmatter": stage_1.get("frontmatter", {}),
-            },
-            evidence_refs=[str(landscape_path)] if stage_1.get("landscape_written") else [],
-        ))
+        self.audit.append(
+            AuditEvent(
+                round=round_n,
+                stage="1",
+                kind="plan",
+                payload={
+                    "landscape_written": stage_1.get("landscape_written", False),
+                    "frontmatter": stage_1.get("frontmatter", {}),
+                },
+                evidence_refs=[str(landscape_path)] if stage_1.get("landscape_written") else [],
+            )
+        )
 
         if not stage_1.get("landscape_written"):
             self._finalize_round(
-                round_n, shipped_cids=[], hit_rate=None,
+                round_n,
+                shipped_cids=[],
+                hit_rate=None,
                 narrative="Planner produced no landscape.md — aborting round",
                 refuted_signatures=[],
             )
@@ -388,12 +419,15 @@ class AegisOrchestrator:
             sessions_dir=round_dir / "meta_sessions" / "evolver",
         )
         for cid, ok, reason in stage_2["results"]:
-            self.audit.append(AuditEvent(
-                round=round_n, stage="2",
-                kind="propose" if ok else "propose_fail",
-                payload={"brief_id": cid, "reason": reason},
-                evidence_refs=[],
-            ))
+            self.audit.append(
+                AuditEvent(
+                    round=round_n,
+                    stage="2",
+                    kind="propose" if ok else "propose_fail",
+                    payload={"brief_id": cid, "reason": reason},
+                    evidence_refs=[],
+                )
+            )
 
         # Stage 3 mini-Evolver factory: Critic calls this when it wants to
         # ask the Evolver a clarifying question about a specific candidate.
@@ -402,30 +436,33 @@ class AegisOrchestrator:
         def evolver_harness_factory(cid: str, brief_path: Path):
             from .agents.evolver import build_evolver_harness, EvolverInputs
             import uuid
+
             askmore_dir = round_dir / "askmore_scratch"
             askmore_dir.mkdir(parents=True, exist_ok=True)
             scratch = askmore_dir / f"{cid}_{uuid.uuid4().hex[:8]}.md"
-            return build_evolver_harness(EvolverInputs(
-                round=round_n,
-                current_config_path=current_config_path,
-                landscape_path=landscape_path,
-                digests_dir=round_dir / "digests",
-                trajectories_dir=round_dir / "trajectories",
-                candidates_dir=round_dir / "candidates",
-                applied_root=round_dir / "applied",
-                ask_more_brief_path=brief_path,
-                ask_more_candidate_id=cid,
-                ask_more_candidate_path=scratch,
-            ))
+            return build_evolver_harness(
+                EvolverInputs(
+                    round=round_n,
+                    current_config_path=current_config_path,
+                    landscape_path=landscape_path,
+                    digests_dir=round_dir / "digests",
+                    trajectories_dir=round_dir / "trajectories",
+                    candidates_dir=round_dir / "candidates",
+                    applied_root=round_dir / "applied",
+                    ask_more_brief_path=brief_path,
+                    ask_more_candidate_id=cid,
+                    ask_more_candidate_path=scratch,
+                )
+            )
 
         # No brief-to-candidate alignment any more — the Critic calls
         # ask_evolver(cid, question) and we pass the candidate's own
         # manifest path as the "brief" (there are no separate briefs).
-        candidate_paths_by_cid = {
-            p.stem: p for p in stage_2["candidate_paths"]
-        }
+        candidate_paths_by_cid = {p.stem: p for p in stage_2["candidate_paths"]}
         evolver_runner = make_evolver_runner(
-            candidate_paths_by_cid, evolver_harness_factory, self.model_config,
+            candidate_paths_by_cid,
+            evolver_harness_factory,
+            self.model_config,
         )
         stage_3 = await run_stage_3(
             round_n=round_n,
@@ -443,17 +480,23 @@ class AegisOrchestrator:
             max_cost_usd=100.0,
             meta_sessions_dir=round_dir / "meta_sessions" / "critic",
         )
-        self.audit.append(AuditEvent(
-            round=round_n, stage="3", kind="decision",
-            payload={"decision_type": (stage_3["decision"] or {}).get("decision_type"),
-                     "critic_failed": stage_3["critic_failed"]},
-            evidence_refs=[str(round_dir / "decision.md")],
-        ))
+        self.audit.append(
+            AuditEvent(
+                round=round_n,
+                stage="3",
+                kind="decision",
+                payload={
+                    "decision_type": (stage_3["decision"] or {}).get("decision_type"),
+                    "critic_failed": stage_3["critic_failed"],
+                },
+                evidence_refs=[str(round_dir / "decision.md")],
+            )
+        )
 
         if stage_3["critic_failed"] or not stage_3["decision"]:
-            self._finalize_round(round_n, shipped_cids=[],
-                                  hit_rate=None, narrative="Critic failed",
-                                  refuted_signatures=[])
+            self._finalize_round(
+                round_n, shipped_cids=[], hit_rate=None, narrative="Critic failed", refuted_signatures=[]
+            )
             return {"shipped_cid": None, "shipped_cids": [], "reason": "critic_failed"}
 
         # Stage 4
@@ -465,24 +508,23 @@ class AegisOrchestrator:
         applied_dir = round_dir / "applied"
         # New layout: applied/<cid>/config.yaml (per-candidate scratch dir
         # where the Evolver wrote any modified template files alongside).
-        candidates_info = {
-            cp.stem: (cp, applied_dir / cp.stem / "config.yaml")
-            for cp in stage_2["candidate_paths"]
-        }
+        candidates_info = {cp.stem: (cp, applied_dir / cp.stem / "config.yaml") for cp in stage_2["candidate_paths"]}
         refuted_sigs = self.journal.all_refuted_signatures()
         # v0.9: wire the counterfactual gate's context — prior-round
         # passing tasks + this round's recorded trajectories. Gate skips
         # silently if context is None / lists empty.
         from .stages.commit import set_counterfactual_context
+
         _passing_tids = sorted(
-            tid for tid, flags in (pass_flags_by_task or {}).items()
-            if flags and all(bool(f) for f in flags)
+            tid for tid, flags in (pass_flags_by_task or {}).items() if flags and all(bool(f) for f in flags)
         )
-        set_counterfactual_context({
-            "passing_task_ids": _passing_tids,
-            "trajectories_dir": round_dir / "trajectories",
-            "k_samples": 3,
-        })
+        set_counterfactual_context(
+            {
+                "passing_task_ids": _passing_tids,
+                "trajectories_dir": round_dir / "trajectories",
+                "k_samples": 3,
+            }
+        )
         # v0.9.3 IV-11: extract strategy_concern_flagged_buckets from the
         # current round's landscape.md frontmatter (Planner relays it from
         # the previous round's Critic decision). Gate is a no-op if the
@@ -493,6 +535,7 @@ class AegisOrchestrator:
             if landscape_path.exists():
                 import yaml as _yaml
                 import re as _re
+
                 _text = landscape_path.read_text(encoding="utf-8")
                 _m = _re.match(r"^---\n(.*?)\n---", _text, _re.DOTALL)
                 if _m:
@@ -502,8 +545,10 @@ class AegisOrchestrator:
                         strategy_concern_flagged = {str(b) for b in _flag if b}
         except Exception as _exc:
             import logging
+
             logging.getLogger("aegis.orchestrator").warning(
-                "landscape strategy_concern_flagged parse failed (non-fatal): %s", _exc,
+                "landscape strategy_concern_flagged parse failed (non-fatal): %s",
+                _exc,
             )
         # v0.9.5: ledger snapshot so IV-12 (iterates_from) can validate.
         try:
@@ -517,8 +562,11 @@ class AegisOrchestrator:
             refuted_signatures=refuted_sigs,
             commit_fn=None,
             archive_fn=lambda cid, ctx: self.archive.store(
-                round_n=round_n, cid=cid,
-                manifest_md=(round_dir / "candidates" / f"{cid}.md").read_text() if (round_dir / "candidates" / f"{cid}.md").exists() else "",
+                round_n=round_n,
+                cid=cid,
+                manifest_md=(round_dir / "candidates" / f"{cid}.md").read_text()
+                if (round_dir / "candidates" / f"{cid}.md").exists()
+                else "",
                 failure_context=ctx if isinstance(ctx, dict) else {"reason": str(ctx)},
             ),
             replay_model=self.replay_model,
@@ -526,29 +574,36 @@ class AegisOrchestrator:
             prior_ships=prior_ships_snapshot,
         )
         for cid, gr in stage_4["gate_results"].items():
-            self.audit.append(AuditEvent(
-                round=round_n, stage="4", kind="gate",
+            self.audit.append(
+                AuditEvent(
+                    round=round_n,
+                    stage="4",
+                    kind="gate",
+                    payload={
+                        "cid": cid,
+                        "results": {k: v.ok for k, v in gr.items()},
+                        # Include per-gate reason for any FAILED gate so a rejected
+                        # candidate's cause is persisted in audit.jsonl without
+                        # requiring access to the in-memory stage output.
+                        "reasons": {k: v.reason for k, v in gr.items() if not v.ok},
+                    },
+                    evidence_refs=[],
+                )
+            )
+        shipped_cids = stage_4.get("shipped_cids") or ([stage_4["shipped_cid"]] if stage_4.get("shipped_cid") else [])
+        self.audit.append(
+            AuditEvent(
+                round=round_n,
+                stage="4",
+                kind="commit" if shipped_cids else "revert",
                 payload={
-                    "cid": cid,
-                    "results": {k: v.ok for k, v in gr.items()},
-                    # Include per-gate reason for any FAILED gate so a rejected
-                    # candidate's cause is persisted in audit.jsonl without
-                    # requiring access to the in-memory stage output.
-                    "reasons": {k: v.reason for k, v in gr.items() if not v.ok},
+                    "shipped_cids": shipped_cids,
+                    "shipped_by_bucket": stage_4.get("shipped_by_bucket", {}),
+                    "reason": stage_4["reason"],
                 },
                 evidence_refs=[],
-            ))
-        shipped_cids = stage_4.get("shipped_cids") or (
-            [stage_4["shipped_cid"]] if stage_4.get("shipped_cid") else []
+            )
         )
-        self.audit.append(AuditEvent(
-            round=round_n, stage="4",
-            kind="commit" if shipped_cids else "revert",
-            payload={"shipped_cids": shipped_cids,
-                     "shipped_by_bucket": stage_4.get("shipped_by_bucket", {}),
-                     "reason": stage_4["reason"]},
-            evidence_refs=[],
-        ))
 
         # Record bucket reputation. Prior semantics appended
         # ``False`` for any non-shipped candidate — which conflated
@@ -570,6 +625,7 @@ class AegisOrchestrator:
         # untouched; the Critic's decision body is the right channel
         # to surface implementation issues to the next round.
         from .agents.evolver import parse_candidate_manifest
+
         shipped_set = set(shipped_cids)
         manifests_by_cid: dict[str, dict] = {}
         for cid, (manifest_path, _cfg_path) in candidates_info.items():
@@ -590,16 +646,19 @@ class AegisOrchestrator:
         # flipped_in_ship_round filled on the NEXT round's backfill
         # (we don't know flips yet this round).
         from .data.scoreboard import ShipRecord
+
         for scid in shipped_cids:
             fm = manifests_by_cid.get(scid) or {}
             predicted = _extract_predicted_tasks(fm)
-            self.scoreboard.add_ship(ShipRecord(
-                cid=scid,
-                round=round_n,
-                bucket=str(fm.get("bucket", "")),
-                predicted_tasks=tuple(predicted),
-                flipped_in_ship_round=(),
-            ))
+            self.scoreboard.add_ship(
+                ShipRecord(
+                    cid=scid,
+                    round=round_n,
+                    bucket=str(fm.get("bucket", "")),
+                    predicted_tasks=tuple(predicted),
+                    flipped_in_ship_round=(),
+                )
+            )
         self.scoreboard.last_updated_round = round_n
 
         # Ledger: one ship_outcomes entry per shipped cid.
@@ -609,9 +668,7 @@ class AegisOrchestrator:
                     continue
                 shipped_fm = manifests_by_cid[scid]
                 predicted = _extract_predicted_tasks(shipped_fm)
-                rejected_siblings = [
-                    c for c in candidates_info if c not in shipped_set
-                ]
+                rejected_siblings = [c for c in candidates_info if c not in shipped_set]
                 attr_sig = shipped_fm.get("attribution_signature")
                 if not isinstance(attr_sig, dict):
                     attr_sig = None
@@ -636,9 +693,12 @@ class AegisOrchestrator:
                         ledger.mark_ship_superseded(self.run_dir, target, by_cid)
                     except Exception as exc:
                         import logging
+
                         logging.getLogger("aegis.orchestrator").warning(
                             "mark_ship_superseded failed for %s→%s: %s",
-                            target, by_cid, exc,
+                            target,
+                            by_cid,
+                            exc,
                         )
 
             rejected_rows = []
@@ -657,24 +717,29 @@ class AegisOrchestrator:
                 if decision_body and cid in decision_body:
                     idx = decision_body.find(cid)
                     start = max(0, idx - 40)
-                    excerpt = decision_body[start:start + 400]
+                    excerpt = decision_body[start : start + 400]
                 predicted = _extract_predicted_tasks(fm)
-                rejected_rows.append({
-                    "candidate_id": cid,
-                    "bucket": str(fm.get("bucket", "")),
-                    "predicted_tasks": predicted,
-                    "rejection_text_excerpt": excerpt,
-                    # confidence / novelty_dimension were dropped from the
-                    # Evolver manifest schema — agents decide without
-                    # self-rated scalars, so ledger no longer records them.
-                    "signature": stage_4.get("candidate_signatures", {}).get(cid, ""),
-                })
+                rejected_rows.append(
+                    {
+                        "candidate_id": cid,
+                        "bucket": str(fm.get("bucket", "")),
+                        "predicted_tasks": predicted,
+                        "rejection_text_excerpt": excerpt,
+                        # confidence / novelty_dimension were dropped from the
+                        # Evolver manifest schema — agents decide without
+                        # self-rated scalars, so ledger no longer records them.
+                        "signature": stage_4.get("candidate_signatures", {}).get(cid, ""),
+                    }
+                )
             if rejected_rows:
                 ledger.append_rejected_candidates(
-                    self.run_dir, round_n, rejected_rows,
+                    self.run_dir,
+                    round_n,
+                    rejected_rows,
                 )
         except Exception as exc:
             import logging
+
             logging.getLogger("aegis.orchestrator").warning(
                 "ledger write (ship_outcomes / rejected_candidates) failed (non-fatal): %s",
                 exc,
@@ -709,6 +774,7 @@ class AegisOrchestrator:
         merged_applied_path: Path | None = None
         if shipped_cids:
             from .compose import compose_shipped_configs
+
             shipped_entries: list[tuple[str, str | list[str], Path]] = []
             for scid in shipped_cids:
                 fm = manifests_by_cid.get(scid, {})
@@ -744,10 +810,7 @@ class AegisOrchestrator:
                     shipped_cids=shipped_cids,
                 )
 
-        narrative = (
-            stage_4["reason"] or
-            (f"shipped {', '.join(shipped_cids)}" if shipped_cids else "no_op")
-        )
+        narrative = stage_4["reason"] or (f"shipped {', '.join(shipped_cids)}" if shipped_cids else "no_op")
         self._finalize_round(
             round_n,
             shipped_cids=shipped_cids,
@@ -765,7 +828,9 @@ class AegisOrchestrator:
         }
 
     def _finalize_round(
-        self, round_n: int, *,
+        self,
+        round_n: int,
+        *,
         shipped_cids: list[str],
         hit_rate: float | None,
         narrative: str,
@@ -787,10 +852,13 @@ class AegisOrchestrator:
             predicted_tasks_by_cid=predicted_tasks_by_cid or {},
         )
         self.journal.append(entry)
-        self.audit.append(AuditEvent(
-            round=round_n, stage="journal", kind="journal",
-            payload={"action": entry.action,
-                     "shipped_cids": shipped_cids},
-            evidence_refs=[str(self.journal.path)],
-        ))
+        self.audit.append(
+            AuditEvent(
+                round=round_n,
+                stage="journal",
+                kind="journal",
+                payload={"action": entry.action, "shipped_cids": shipped_cids},
+                evidence_refs=[str(self.journal.path)],
+            )
+        )
         self._persist_state()

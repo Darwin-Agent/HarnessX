@@ -10,6 +10,7 @@ rewrite it — Layer B (pathology signals) and Layer C (diagnosis) build on top.
 Design: every fact carries a trajectory anchor (`trajectories/<file>#step_N`)
 so downstream agents can always back-cite to the raw event.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -88,7 +89,7 @@ class ToolCallFact:
     tool: str
     args_sha: str
     args_preview: str  # short JSON-preview of args, ≤ 120 chars
-    return_type: str   # text | multimodal | multimodal_coerced | short_marker | empty | error
+    return_type: str  # text | multimodal | multimodal_coerced | short_marker | empty | error
     return_len: int
     next_uses_result: bool | None  # heuristic; None if no next assistant step
 
@@ -124,12 +125,13 @@ class ToolBurst:
     SmartFetch 75× across 30 different URLs). Bursts are detected from
     aggregate counts so that pattern is surfaced.
     """
+
     rollout: str
     tool: str
-    total_calls: int               # whole-rollout total
-    max_calls_in_one_step: int     # peak parallel/iterated count within one step
-    peak_step: int                 # step where the peak happened
-    severity: str                  # "high" if total >= 30 or peak >= 15, else "medium"
+    total_calls: int  # whole-rollout total
+    max_calls_in_one_step: int  # peak parallel/iterated count within one step
+    peak_step: int  # step where the peak happened
+    severity: str  # "high" if total >= 30 or peak >= 15, else "medium"
 
 
 # Thresholds chosen so a healthy multi-tool trajectory (typically ≤ 5–10
@@ -177,9 +179,7 @@ class TraceFacts:
             snip = e.terminal_snippet.replace("|", "/").replace("\n", " ")[:160]
             if len(e.terminal_snippet) > 160:
                 snip += "…"
-            lines.append(
-                f"| {e.rollout} | {e.exit_reason} | {e.total_steps} | {passed_str} | {snip} |"
-            )
+            lines.append(f"| {e.rollout} | {e.exit_reason} | {e.total_steps} | {passed_str} | {snip} |")
         if not self.exits:
             lines.append("| (no episode_end events) |  |  |  |  |")
         lines.append("")
@@ -193,20 +193,15 @@ class TraceFacts:
                 lines.append(f"**{rollout}** — no tool calls.")
                 lines.append("")
                 continue
-            lines.append(
-                f"**{rollout}** → `trajectories/{self.trajectory_file_by_rollout.get(rollout, '')}`"
-            )
+            lines.append(f"**{rollout}** → `trajectories/{self.trajectory_file_by_rollout.get(rollout, '')}`")
             lines.append("")
-            lines.append(
-                "| step | tool | args_sha | args_preview | return_type | return_len | next_uses_result |"
-            )
+            lines.append("| step | tool | args_sha | args_preview | return_type | return_len | next_uses_result |")
             lines.append("|---|---|---|---|---|---|---|")
             for c in calls:
                 nu = "—" if c.next_uses_result is None else ("yes" if c.next_uses_result else "**NO**")
                 prev = c.args_preview.replace("|", "/").replace("\n", " ")
                 lines.append(
-                    f"| {c.step} | `{c.tool}` | {c.args_sha} | {prev} "
-                    f"| {c.return_type} | {c.return_len} | {nu} |"
+                    f"| {c.step} | `{c.tool}` | {c.args_sha} | {prev} | {c.return_type} | {c.return_len} | {nu} |"
                 )
             lines.append("")
 
@@ -218,10 +213,7 @@ class TraceFacts:
         else:
             for r in self.repeats:
                 anchor = self.anchor(r.rollout, r.steps[0])
-                lines.append(
-                    f"- **{r.rollout}** `{r.tool}` args_sha={r.args_sha} at steps {r.steps} "
-                    f"— {anchor}"
-                )
+                lines.append(f"- **{r.rollout}** `{r.tool}` args_sha={r.args_sha} at steps {r.steps} — {anchor}")
         lines.append("")
 
         # --- Tool bursts (suspected loop trap) ---
@@ -399,9 +391,7 @@ def extract_trace_facts(
                     )
                 run_tool, run_sha, run_steps = c.tool, c.args_sha, [c.step]
         if run_tool is not None and len(run_steps) >= 2:
-            facts.repeats.append(
-                RepeatRun(rollout=rollout, tool=run_tool, args_sha=run_sha, steps=list(run_steps))
-            )
+            facts.repeats.append(RepeatRun(rollout=rollout, tool=run_tool, args_sha=run_sha, steps=list(run_steps)))
 
         # Burst detection: same tool called many times in one rollout, even
         # when args differ between calls (so the consecutive-same-args

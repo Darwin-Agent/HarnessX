@@ -38,6 +38,7 @@ Pure-prompt rounds therefore degrade gracefully (everything is joint —
 same as today, but explicitly so), and any round with at least one
 mechanical-signature ship yields clean attribution for that ship.
 """
+
 from __future__ import annotations
 
 import re
@@ -70,7 +71,8 @@ def _parse_tool_call_counts(md_text: str) -> dict[str, int]:
 
 
 def _infer_default_signature(
-    bucket: str | None, manifest: dict | None,
+    bucket: str | None,
+    manifest: dict | None,
 ) -> dict | None:
     """Best-effort signature inference when the manifest does not declare
     one explicitly.
@@ -123,7 +125,10 @@ def _infer_default_signature(
 
 
 def _check_signature(
-    sig: dict, run_root: Path, round_n: int, task_id: str,
+    sig: dict,
+    run_root: Path,
+    round_n: int,
+    task_id: str,
 ) -> str:
     """Return ``direct`` if the signature fired on this task in any
     rollout, ``orphan`` otherwise. Trajectories named ``<tid>.md`` (k=1)
@@ -133,9 +138,7 @@ def _check_signature(
     if not traj_dir.exists():
         return "orphan"
 
-    candidates = list(traj_dir.glob(f"{task_id}.md")) + list(
-        traj_dir.glob(f"{task_id}_r*.md")
-    )
+    candidates = list(traj_dir.glob(f"{task_id}.md")) + list(traj_dir.glob(f"{task_id}_r*.md"))
     if not candidates:
         return "orphan"
 
@@ -188,10 +191,7 @@ def compute_evidence(
     sig = attribution_signature or _infer_default_signature(bucket, manifest)
     if sig is None:
         return {tid: "joint" for tid in predicted_tasks}
-    return {
-        tid: _check_signature(sig, run_root, round_n, tid)
-        for tid in predicted_tasks
-    }
+    return {tid: _check_signature(sig, run_root, round_n, tid) for tid in predicted_tasks}
 
 
 def summarize_evidence(evidence: dict[str, str]) -> dict[str, int]:
