@@ -9,6 +9,24 @@ tell future-Evolver what to preserve and what still worries you.
 MUST cite a trajectory anchor and quote a ≤200-char snippet from the raw
 event. No anchor = hallucination.
 
+**Anchor mechanics — read carefully:**
+
+1. The exact relative paths to use are listed in Layer A's "Tool calls"
+   section (the `**rN** → trajectories/<file>` lines). **Copy them
+   verbatim — do not retype filenames or guess UUIDs.** A digest whose
+   anchor target does not exist is rejected by the structure gate.
+2. Anchor format: `trajectories/<exact-filename>#step_<N>` for a
+   specific step, or `trajectories/<exact-filename>#summary` when the
+   trajectory is trivially short (e.g. zero tool calls, single-turn
+   answer) and there is no single step to point at. ALL_PASS digests of
+   trivial tasks must still include at least one `#summary` anchor so
+   the structure gate can confirm the digest was actually grounded in
+   the trajectory.
+3. **If Layer A's "Tool burst" row is non-empty, you MUST list at least
+   one `tool_burst_loop` (severity=high) entry in Layer B citing the
+   peak step** even on ALL_PASS — a task that passed despite a burst is
+   latent fragility and the next round may not be lucky.
+
 ## Trajectories to read
 
 {% for path in trajectory_paths -%}

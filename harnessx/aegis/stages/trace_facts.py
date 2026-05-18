@@ -115,12 +115,39 @@ class RepeatRun:
 
 
 @dataclass
+class ToolBurst:
+    """A single tool was hammered in one rollout — likely a loop trap.
+
+    The existing ``RepeatRun`` only fires when args are byte-identical
+    between calls (and no other tool intervenes). That misses the common
+    case where a tool is called many times with *different* args (e.g.
+    SmartFetch 75× across 30 different URLs). Bursts are detected from
+    aggregate counts so that pattern is surfaced.
+    """
+    rollout: str
+    tool: str
+    total_calls: int               # whole-rollout total
+    max_calls_in_one_step: int     # peak parallel/iterated count within one step
+    peak_step: int                 # step where the peak happened
+    severity: str                  # "high" if total >= 30 or peak >= 15, else "medium"
+
+
+# Thresholds chosen so a healthy multi-tool trajectory (typically ≤ 5–10
+# calls of any one tool, ≤ 3 in any single step) never trips, but the
+# observed loop-trap shape (e.g. 75 SmartFetch in 19 steps with peak ~30
+# in step 1) reliably does.
+_BURST_TOTAL_MIN = 20
+_BURST_PEAK_MIN = 10
+
+
+@dataclass
 class TraceFacts:
     task_id: str
     rollouts: list[str] = field(default_factory=list)
     tool_calls: list[ToolCallFact] = field(default_factory=list)
     exits: list[ExitFact] = field(default_factory=list)
     repeats: list[RepeatRun] = field(default_factory=list)
+    bursts: list[ToolBurst] = field(default_factory=list)
     trajectory_file_by_rollout: dict[str, str] = field(default_factory=dict)
 
     def anchor(self, rollout: str, step: int) -> str:
@@ -194,6 +221,30 @@ class TraceFacts:
                 lines.append(
                     f"- **{r.rollout}** `{r.tool}` args_sha={r.args_sha} at steps {r.steps} "
                     f"— {anchor}"
+                )
+        lines.append("")
+
+        # --- Tool bursts (suspected loop trap) ---
+        lines.append("### Tool burst (suspected loop trap — same tool hammered)")
+        lines.append("")
+        if not self.bursts:
+            lines.append("_None detected._")
+        else:
+            lines.append(
+                "_Heuristic: a single tool called >=20 times in a rollout OR "
+                ">=10 times concentrated in one step. The args may differ "
+                "between calls (e.g. iterating URLs) so this is the loop "
+                "pattern the consecutive-same-args repeat detector misses. "
+                "If a newly-shipped tool appears here, treat it as evidence "
+                "the candidate enabled budget burn rather than progress._"
+            )
+            lines.append("")
+            for b in self.bursts:
+                anchor = self.anchor(b.rollout, b.peak_step)
+                lines.append(
+                    f"- **{b.rollout}** `{b.tool}` total={b.total_calls}, "
+                    f"peak={b.max_calls_in_one_step} at step {b.peak_step} "
+                    f"(severity={b.severity}) — {anchor}"
                 )
         lines.append("")
 
@@ -350,6 +401,40 @@ def extract_trace_facts(
         if run_tool is not None and len(run_steps) >= 2:
             facts.repeats.append(
                 RepeatRun(rollout=rollout, tool=run_tool, args_sha=run_sha, steps=list(run_steps))
+            )
+
+        # Burst detection: same tool called many times in one rollout, even
+        # when args differ between calls (so the consecutive-same-args
+        # repeat detector above misses it). Catches loop traps where a
+        # newly-shipped tool is hammered in a tight retry loop and the
+        # surrounding budget gets burned. A trace with >=20 calls of one
+        # tool, OR >=10 calls of one tool concentrated in a single step,
+        # is reported. Healthy multi-tool traces stay well under both.
+        per_tool_total: dict[str, int] = {}
+        per_tool_step_max: dict[str, tuple[int, int]] = {}  # (peak_count, peak_step)
+        per_tool_step_running: dict[tuple[str, int], int] = {}
+        for c in per_rollout_calls:
+            per_tool_total[c.tool] = per_tool_total.get(c.tool, 0) + 1
+            key = (c.tool, c.step)
+            per_tool_step_running[key] = per_tool_step_running.get(key, 0) + 1
+            n = per_tool_step_running[key]
+            cur = per_tool_step_max.get(c.tool)
+            if cur is None or n > cur[0]:
+                per_tool_step_max[c.tool] = (n, c.step)
+        for tool, total in per_tool_total.items():
+            peak, peak_step = per_tool_step_max.get(tool, (0, 0))
+            if total < _BURST_TOTAL_MIN and peak < _BURST_PEAK_MIN:
+                continue
+            severity = "high" if (total >= 30 or peak >= 15) else "medium"
+            facts.bursts.append(
+                ToolBurst(
+                    rollout=rollout,
+                    tool=tool,
+                    total_calls=total,
+                    max_calls_in_one_step=peak,
+                    peak_step=peak_step,
+                    severity=severity,
+                )
             )
 
         # Exit summary
