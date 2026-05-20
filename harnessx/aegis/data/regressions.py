@@ -143,26 +143,47 @@ def detect_regressions(
     return out
 
 
-def render_regressions_md(round_n: int, regressions: list[dict]) -> str:
+def render_regressions_md(
+    round_n: int,
+    regressions: list[dict],
+    *,
+    for_evolve_round_n: int | None = None,
+) -> str:
     """Markdown rendering written to ``R{N}/regressions.md``.
 
     Always emits a file (even when empty) so downstream prompts can
     reliably refer to ``R{N}/regressions.md`` without conditional
     presence checks.
+
+    When ``for_evolve_round_n`` is given the title and lead paragraph
+    explain that the file surfaces regressions from the *prior*
+    completed round so the *current* evolve round can address them.
     """
     lines: list[str] = []
-    lines.append(f"# Regressions detected in R{round_n}")
+    if for_evolve_round_n is not None:
+        lines.append(f"# Regressions in R{round_n} batch (surfaced before R{for_evolve_round_n} evolve)")
+    else:
+        lines.append(f"# Regressions detected in R{round_n}")
     lines.append("")
-    lines.append(
-        "Tasks whose pass-state worsened versus the previous round, "
-        "computed mechanically from `data/task_history.jsonl`. "
-        "Each entry is a *joint* attribution: any ship at round={n} is "
-        "a candidate cause (those ships built this round's config and "
-        "thus produced this round's regressions) and is listed below. "
-        "Use `data/ship_outcomes.json[].evidence_per_task` to separate "
-        "ships with mechanical evidence (tools/processor) from ships "
-        "without (prompt/config — joint by definition).".format(n=round_n)
-    )
+    if for_evolve_round_n is not None:
+        lines.append(
+            f"Tasks whose pass-state worsened in R{round_n} versus R{round_n - 1}, "
+            "computed mechanically from `data/task_history.jsonl`. "
+            f"Joint-suspect ships are those tagged `round={round_n}` (they built "
+            f"the R{round_n} config that produced these regressions). "
+            f"Evolver/Critic must address these when proposing for R{for_evolve_round_n}."
+        )
+    else:
+        lines.append(
+            "Tasks whose pass-state worsened versus the previous round, "
+            "computed mechanically from `data/task_history.jsonl`. "
+            "Each entry is a *joint* attribution: any ship at round={n} is "
+            "a candidate cause (those ships built this round's config and "
+            "thus produced this round's regressions) and is listed below. "
+            "Use `data/ship_outcomes.json[].evidence_per_task` to separate "
+            "ships with mechanical evidence (tools/processor) from ships "
+            "without (prompt/config — joint by definition).".format(n=round_n)
+        )
     lines.append("")
 
     if not regressions:
@@ -214,14 +235,31 @@ def write_regressions_md(
     run_root: Path,
     round_n: int,
     out_path: Path | None = None,
+    *,
+    for_evolve_round_n: int | None = None,
 ) -> Path:
-    """Compute + write ``R{N}/regressions.md``. Returns the output path."""
+    """Compute + write a regressions markdown file. Returns the output path.
+
+    Two call shapes:
+
+    1. ``write_regressions_md(run_root, round_n)`` — analyses
+       R{round_n-1} → R{round_n}, writes to ``R{round_n}/regressions.md``.
+       Used by post-hoc analysis tools.
+
+    2. ``write_regressions_md(run_root, round_n, for_evolve_round_n=N)``
+       where ``N == round_n + 1`` — analyses the same window but emits
+       to ``R{N}/regressions.md`` with a title that makes clear the file
+       lives next to round N's evolve materials. Used by the orchestrator
+       at the start of round N evolve, when round N's task batch has not
+       yet run and the most recent observable comparison is R{N-2}→R{N-1}.
+    """
     regressions = detect_regressions(run_root, round_n)
     if out_path is None:
-        out_path = run_root / f"R{round_n}" / "regressions.md"
+        target_round = for_evolve_round_n if for_evolve_round_n is not None else round_n
+        out_path = run_root / f"R{target_round}" / "regressions.md"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
-        render_regressions_md(round_n, regressions),
+        render_regressions_md(round_n, regressions, for_evolve_round_n=for_evolve_round_n),
         encoding="utf-8",
     )
     return out_path

@@ -227,14 +227,28 @@ class AegisOrchestrator:
         # AP→AF / AP→PP / PARTIAL→worse transitions that ship_outcomes'
         # hit_rate metric does not penalise (it counts predicted-task
         # improvements only).
-        try:
-            from .data.regressions import write_regressions_md
+        #
+        # Off-by-one note: at the start of round N evolve, task_history
+        # holds rounds 0..N-1 (round N batch has not run yet). The most
+        # recent observable comparison is therefore R{N-2}→R{N-1}, with
+        # the suspect ships being those tagged round=N-1. The orchestrator
+        # writes the result into R{N}/regressions.md (next to evolve
+        # materials) but the analysis target is round_n - 1.
+        if round_n >= 1:
+            try:
+                from .data.regressions import write_regressions_md
 
-            write_regressions_md(self.run_dir, round_n)
-        except Exception as exc:
-            import logging
+                write_regressions_md(
+                    self.run_dir,
+                    round_n - 1,
+                    for_evolve_round_n=round_n,
+                )
+            except Exception as exc:
+                import logging
 
-            logging.getLogger("aegis.orchestrator").warning("regressions watchlist write failed (non-fatal): %s", exc)
+                logging.getLogger("aegis.orchestrator").warning(
+                    "regressions watchlist write failed (non-fatal): %s", exc
+                )
 
         # v0.9: backfill scoreboard's per-ship flipped_in_ship_round from the
         # same ship_outcomes ledger we just refreshed. Atomic per-record

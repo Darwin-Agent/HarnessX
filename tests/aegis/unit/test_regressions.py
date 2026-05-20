@@ -195,3 +195,55 @@ def test_write_regressions_md_creates_file(tmp_path: Path) -> None:
     body = out.read_text()
     assert "regressed_hard" in body
     assert out.parent.name == "R1"
+
+
+def test_write_regressions_md_for_evolve_round_emits_into_next_round_dir(
+    tmp_path: Path,
+) -> None:
+    """Regression for the off-by-one bug: orchestrator wants regressions
+    surfaced at the start of round N evolve, when only rounds 0..N-1 are
+    in task_history. The analysis target is N-1 (compares R{N-2} vs
+    R{N-1}) but the file must land in R{N}/regressions.md so the round-N
+    Evolver/Critic prompts can read a stable path."""
+    _seed_history(
+        tmp_path,
+        [
+            {"round": 0, "task_id": "t1", "passed_flags": [True, True]},
+            {"round": 1, "task_id": "t1", "passed_flags": [False, False]},
+        ],
+    )
+    _seed_outcomes(
+        tmp_path,
+        [
+            {"ship_id": "C-R1-X", "round": 1, "bucket": "prompt"},
+        ],
+    )
+    out = write_regressions_md(tmp_path, 1, for_evolve_round_n=2)
+    assert out.parent.name == "R2", out.parent.name
+    body = out.read_text()
+    # Title clearly distinguishes the analysed round from the evolve round.
+    assert "Regressions in R1 batch" in body
+    assert "before R2 evolve" in body
+    # Suspect ship from R1 (the one that built the broken config) is still listed.
+    assert "C-R1-X" in body
+    assert "regressed_hard" in body
+
+
+def test_write_regressions_md_for_evolve_round_renders_empty_state(
+    tmp_path: Path,
+) -> None:
+    """When no regressions exist, the file is still emitted with an
+    explanatory title — downstream prompts rely on the path always
+    being present."""
+    _seed_history(
+        tmp_path,
+        [
+            {"round": 0, "task_id": "t1", "passed_flags": [True, True]},
+            {"round": 1, "task_id": "t1", "passed_flags": [True, True]},
+        ],
+    )
+    out = write_regressions_md(tmp_path, 1, for_evolve_round_n=2)
+    body = out.read_text()
+    assert "No regressions detected this round" in body
+    assert "Regressions in R1 batch" in body
+    assert "before R2 evolve" in body
