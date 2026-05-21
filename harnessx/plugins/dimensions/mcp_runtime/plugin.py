@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 
 _MAX_RETRIES = 3
 _BACKOFF_BASE = 1.0  # seconds; delay = _BACKOFF_BASE * 2 ** (attempt - 1), capped at 30 s
+_CONNECT_TIMEOUT = 30.0  # seconds; per-server initialize handshake budget
+_DISCONNECT_TIMEOUT = 10.0  # seconds; per-server graceful close budget
 
 
 @dataclass
@@ -71,13 +73,14 @@ class _LifecycleSupervisor:
         self,
         label: str,
         coro_factory: Callable[[], Awaitable[Any]],
+        timeout: float | None = None,
     ) -> Any:
         loop = asyncio.get_running_loop()
         if self._task is None or self._task.done() or self._loop is not loop:
             self._start(loop)
         assert self._queue is not None
         fut: asyncio.Future = loop.create_future()
-        self._queue.put_nowait((label, coro_factory, fut))
+        self._queue.put_nowait((label, coro_factory, fut, timeout))
         return await asyncio.shield(fut)
 
     async def _run(self, queue: asyncio.Queue) -> None:
@@ -89,17 +92,65 @@ class _LifecycleSupervisor:
                 raise
             if item is None:
                 break
-            label, coro_factory, fut = item
+            label, coro_factory, fut, timeout = item
             try:
-                result = await coro_factory()
+                result = await self._run_one(label, coro_factory, timeout)
+            except asyncio.CancelledError:
+                if not fut.done():
+                    fut.cancel()
+                raise
             except BaseException as exc:
                 if not fut.done():
                     fut.set_exception(exc)
-                if isinstance(exc, asyncio.CancelledError):
-                    raise
             else:
                 if not fut.done():
                     fut.set_result(result)
+
+    @staticmethod
+    async def _run_one(
+        label: str,
+        coro_factory: Callable[[], Awaitable[Any]],
+        timeout: float | None,
+    ) -> Any:
+        """Run ``coro_factory()`` on the supervisor task with an optional budget.
+
+        We deliberately avoid ``asyncio.wait_for`` because it wraps the coroutine
+        in a child Task — that would make ``__aenter__`` and ``__aexit__`` of the
+        MCP/anyio scopes run on different tasks, recreating the cross-task bug
+        the supervisor exists to prevent. Instead we schedule a one-shot timer
+        that cancels the supervisor task itself; the cancellation propagates
+        into ``coro_factory()`` (same task — anyio scopes unwind cleanly), and
+        we then ``uncancel()`` so the supervisor loop survives.
+        """
+        if timeout is None:
+            return await coro_factory()
+        loop = asyncio.get_running_loop()
+        current = asyncio.current_task()
+        timed_out = False
+
+        def _on_timeout() -> None:
+            nonlocal timed_out
+            timed_out = True
+            if current is not None and not current.done():
+                current.cancel()
+
+        handle = loop.call_later(timeout, _on_timeout)
+        try:
+            return await coro_factory()
+        except asyncio.CancelledError:
+            if timed_out:
+                if current is not None and callable(getattr(current, "uncancel", None)):
+                    try:
+                        while current.cancelling():
+                            current.uncancel()
+                    except Exception:
+                        pass
+                raise TimeoutError(
+                    f"MCP lifecycle '{label}' exceeded {timeout}s"
+                ) from None
+            raise
+        finally:
+            handle.cancel()
 
     @staticmethod
     def _drain(queue: asyncio.Queue) -> None:
@@ -110,8 +161,8 @@ class _LifecycleSupervisor:
                 return
             if item is None:
                 continue
-            _, _, fut = item
-            if not fut.done():
+            fut = item[2] if len(item) >= 3 else None
+            if fut is not None and not fut.done():
                 fut.cancel()
 
     async def stop(self, timeout: float = 10.0) -> None:
@@ -335,6 +386,7 @@ class McpRuntimePlugin(HarnessPlugin):
         await self._supervisor.submit(
             f"connect[{name}]",
             lambda c=client: c.connect(),
+            timeout=_CONNECT_TIMEOUT,
         )
 
     async def _run_disconnect(self, name: str, client: MCPClient) -> None:
@@ -342,6 +394,7 @@ class McpRuntimePlugin(HarnessPlugin):
             await self._supervisor.submit(
                 f"disconnect[{name}]",
                 lambda c=client: c.disconnect(),
+                timeout=_DISCONNECT_TIMEOUT,
             )
         except BaseException as exc:
             warnings.warn(

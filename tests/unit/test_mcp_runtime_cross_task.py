@@ -155,6 +155,54 @@ class TestLifecycleSupervisor:
         await sup.stop()
         assert sup._task is None
 
+    @pytest.mark.asyncio
+    async def test_timeout_aborts_hung_job_and_keeps_supervisor_alive(self) -> None:
+        """A hung job must time out and let later submissions proceed."""
+        sup = _LifecycleSupervisor()
+
+        async def hang() -> None:
+            await asyncio.Event().wait()  # never set
+
+        async def fast() -> str:
+            return "ok"
+
+        try:
+            with pytest.raises(TimeoutError):
+                await sup.submit("hang", hang, timeout=0.1)
+            # Supervisor must still be alive and able to run the next job.
+            result = await sup.submit("fast", fast, timeout=1.0)
+            assert result == "ok"
+            assert sup._task is not None
+            assert not sup._task.done()
+        finally:
+            await sup.stop()
+
+    @pytest.mark.asyncio
+    async def test_timeout_runs_cleanup_on_supervisor_task(self) -> None:
+        """When timeout fires, the cancellation must propagate inside the same
+        task so context-manager cleanup runs without cross-task RuntimeError."""
+        sup = _LifecycleSupervisor()
+        cleanup_task: list[asyncio.Task] = []
+
+        class _CM:
+            async def __aenter__(self) -> "_CM":
+                return self
+
+            async def __aexit__(self, *exc: object) -> None:
+                cleanup_task.append(asyncio.current_task())  # type: ignore[arg-type]
+
+        async def hang_in_cm() -> None:
+            async with _CM():
+                await asyncio.Event().wait()
+
+        try:
+            with pytest.raises(TimeoutError):
+                await sup.submit("hang", hang_in_cm, timeout=0.1)
+            assert len(cleanup_task) == 1
+            assert cleanup_task[0] is sup._task
+        finally:
+            await sup.stop()
+
 
 # ── Plugin: connect/disconnect run on supervisor regardless of caller task ──
 
