@@ -9,7 +9,7 @@ import warnings
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable
 
 from ....core.processor import MultiHookProcessor
 from ....tools.base import Tool
@@ -36,6 +36,108 @@ class _ServerState:
     attempt: int = 0
     give_up: bool = False
     registered_tools: set[str] = field(default_factory=set)
+
+
+class _LifecycleSupervisor:
+    """Single dedicated asyncio task that owns all MCPClient connect/disconnect.
+
+    The MCP SDK + anyio open TaskGroups and CancelScopes inside ``connect()``
+    that are bound to the entering task. Exiting them from a different task
+    raises ``RuntimeError("different task")`` *before* anyio runs its cleanup,
+    leaving an orphan scope whose ``_deliver_cancellation`` re-arms forever via
+    ``call_soon`` — a 100% CPU hot loop in the event loop.
+
+    Routing every ``connect()`` / ``disconnect()`` through this single supervisor
+    guarantees ``__aenter__`` and ``__aexit__`` happen on the same task, so the
+    cross-task path is never hit.
+
+    The supervisor is lazily started on first submit, rebound to whichever event
+    loop is running. Callers ``await`` per-request futures shielded against
+    cancellation so a cancelled caller does not abort an in-flight cleanup that
+    would otherwise leak resources.
+    """
+
+    def __init__(self) -> None:
+        self._queue: asyncio.Queue | None = None
+        self._task: asyncio.Task | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    def _start(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
+        self._queue = asyncio.Queue()
+        self._task = loop.create_task(self._run(self._queue), name="mcp-lifecycle-supervisor")
+
+    async def submit(
+        self,
+        label: str,
+        coro_factory: Callable[[], Awaitable[Any]],
+    ) -> Any:
+        loop = asyncio.get_running_loop()
+        if self._task is None or self._task.done() or self._loop is not loop:
+            self._start(loop)
+        assert self._queue is not None
+        fut: asyncio.Future = loop.create_future()
+        self._queue.put_nowait((label, coro_factory, fut))
+        return await asyncio.shield(fut)
+
+    async def _run(self, queue: asyncio.Queue) -> None:
+        while True:
+            try:
+                item = await queue.get()
+            except asyncio.CancelledError:
+                self._drain(queue)
+                raise
+            if item is None:
+                break
+            label, coro_factory, fut = item
+            try:
+                result = await coro_factory()
+            except BaseException as exc:
+                if not fut.done():
+                    fut.set_exception(exc)
+                if isinstance(exc, asyncio.CancelledError):
+                    raise
+            else:
+                if not fut.done():
+                    fut.set_result(result)
+
+    @staticmethod
+    def _drain(queue: asyncio.Queue) -> None:
+        while True:
+            try:
+                item = queue.get_nowait()
+            except asyncio.QueueEmpty:
+                return
+            if item is None:
+                continue
+            _, _, fut = item
+            if not fut.done():
+                fut.cancel()
+
+    async def stop(self, timeout: float = 10.0) -> None:
+        task = self._task
+        queue = self._queue
+        if task is None or task.done() or queue is None:
+            self._task = None
+            self._queue = None
+            self._loop = None
+            return
+        try:
+            queue.put_nowait(None)
+        except Exception:
+            pass
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            task.cancel()
+            try:
+                await task
+            except BaseException:
+                pass
+        finally:
+            self._task = None
+            self._queue = None
+            self._loop = None
 
 
 class McpRuntimeTaskStartProcessor(MultiHookProcessor):
@@ -80,6 +182,7 @@ class McpRuntimePlugin(HarnessPlugin):
         self._servers: "OrderedDict[str, _ServerState]" = OrderedDict()
         self._tool_registry: Any = None
         self._harness_config: Any = None
+        self._supervisor = _LifecycleSupervisor()
         self.processors = [McpRuntimeTaskStartProcessor(self)]
 
     def add_inline_servers(self, servers: list[dict[str, Any]]) -> None:
@@ -150,8 +253,14 @@ class McpRuntimePlugin(HarnessPlugin):
         }
 
     async def stop(self) -> None:
-        await self._disconnect_all(drop_tools=True)
-        self._servers_sig = ""
+        try:
+            await self._disconnect_all(drop_tools=True)
+        finally:
+            self._servers_sig = ""
+            try:
+                await self._supervisor.stop()
+            except Exception:
+                pass
 
     def _load_servers(self) -> list[dict[str, Any]]:
         loaded = resolve_mcp_servers(
@@ -215,14 +324,30 @@ class McpRuntimePlugin(HarnessPlugin):
         client = state.client
         if client is not None:
             try:
-                await client.disconnect()
-            except Exception:
-                pass
+                await self._run_disconnect(state.name, client)
             finally:
                 state.client = None
         if drop_tools:
             self._drop_tools(state.registered_tools)
             state.registered_tools.clear()
+
+    async def _run_connect(self, name: str, client: MCPClient) -> None:
+        await self._supervisor.submit(
+            f"connect[{name}]",
+            lambda c=client: c.connect(),
+        )
+
+    async def _run_disconnect(self, name: str, client: MCPClient) -> None:
+        try:
+            await self._supervisor.submit(
+                f"disconnect[{name}]",
+                lambda c=client: c.disconnect(),
+            )
+        except BaseException as exc:
+            warnings.warn(
+                f"McpRuntimePlugin: disconnect failed for '{name}': {exc!r}",
+                stacklevel=2,
+            )
 
     async def _connect_server(self, state: _ServerState, event: "TaskStartEvent | None") -> bool:
         spec = state.spec
@@ -243,7 +368,7 @@ class McpRuntimePlugin(HarnessPlugin):
                 url=str(spec.get("url", "") or ""),
                 env=spec.get("env") or None,
             )
-            await client.connect()
+            await self._run_connect(name, client)
             state.client = client
 
             registry = self._resolve_registry(event)
@@ -252,10 +377,7 @@ class McpRuntimePlugin(HarnessPlugin):
                     f"McpRuntimePlugin: connected to '{name}' but no tool_registry available.",
                     stacklevel=2,
                 )
-                try:
-                    await client.disconnect()
-                except Exception:
-                    pass
+                await self._run_disconnect(name, client)
                 state.client = None
                 return False
 
@@ -272,12 +394,8 @@ class McpRuntimePlugin(HarnessPlugin):
                     stacklevel=2,
                 )
                 if state.client is not None:
-                    try:
-                        await state.client.disconnect()
-                    except Exception:
-                        pass
-                    finally:
-                        state.client = None
+                    await self._run_disconnect(name, state.client)
+                    state.client = None
                 # Python 3.12 structured cancellation: catching CancelledError without
                 # re-raising leaves the task's cancellation counter incremented.
                 # Call uncancel() so subsequent awaits in the caller are not poisoned.
@@ -305,7 +423,7 @@ class McpRuntimePlugin(HarnessPlugin):
                 )
             if state.client is not None:
                 try:
-                    await state.client.disconnect()
+                    await self._run_disconnect(name, state.client)
                 except Exception:
                     pass
                 finally:
