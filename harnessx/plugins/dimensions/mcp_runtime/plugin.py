@@ -145,9 +145,7 @@ class _LifecycleSupervisor:
                             current.uncancel()
                     except Exception:
                         pass
-                raise TimeoutError(
-                    f"MCP lifecycle '{label}' exceeded {timeout}s"
-                ) from None
+                raise TimeoutError(f"MCP lifecycle '{label}' exceeded {timeout}s") from None
             raise
         finally:
             handle.cancel()
