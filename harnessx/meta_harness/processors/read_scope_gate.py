@@ -2,15 +2,18 @@
 # SPDX-License-Identifier: MIT
 """Read-scope gate processor for the meta-agent.
 
-Blocks Read / Grep / Glob calls that target restricted root directories,
-with explicit per-file exceptions.  Intended to prevent the meta-agent from
-spending steps deep-diving into harnessx source code when the SKILL.md files
-already provide the necessary API surface.
+Blocks Read / Grep / Glob / Bash calls that target restricted root
+directories, with explicit per-file exceptions.  Intended to prevent the
+meta-agent from spending steps deep-diving into harnessx source code
+when the SKILL.md files already provide the necessary API surface, AND
+to prevent cross-experiment leakage (e.g. reading archived prior runs'
+data into a fresh run's decision-making context).
 """
 
 from __future__ import annotations
 
 import dataclasses
+import re
 from pathlib import Path
 
 from ...core.events import ToolCallEvent
@@ -30,17 +33,31 @@ def _resolve(value: str) -> Path | None:
         return None
 
 
+# Match absolute POSIX-style paths inside a Bash command string. Meta-agents
+# are trusted, not adversarial, so a plain regex is enough — we don't try to
+# unpack shell expansions, subshells, or obfuscated path construction. The
+# goal is "catch the common case where the agent Cats or Greps an archive
+# directory directly", not "defeat a determined bypass attempt".
+_ABS_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])(/[A-Za-z0-9_][A-Za-z0-9_./\-]*)")
+
+
 class ReadScopeGateProcessor(MultiHookProcessor):
-    """Block Read / Grep / Glob calls that target restricted root directories.
+    """Block tool calls that target restricted root directories.
 
     Paths listed in ``allowed_files`` are always permitted even if they fall
     under a ``blocked_roots`` entry.  All other paths under ``blocked_roots``
     are rejected with a helpful error message pointing the agent at the
     relevant SKILL.md instead.
 
-    Only ``Read``, ``Grep``, and ``Glob`` are intercepted.  ``Bash`` commands
-    that shell-read files are not blocked here (they are typically less
-    frequent and harder to parse reliably).
+    Coverage:
+
+    - ``Read``: checks ``file_path`` argument.
+    - ``Grep`` / ``Glob``: checks ``path`` argument.
+    - ``Bash``: extracts every absolute path token from the ``command``
+      string via regex and checks each. Substring-level check — does not
+      attempt to expand ``$VAR``, subshells, or tilde resolution. This is
+      adequate for trusted-agent scoping (keep meta-agent out of archived
+      runs' directories), not adversarial sandboxing.
     """
 
     _singleton_group = "meta_read_scope_gate"
@@ -79,7 +96,7 @@ class ReadScopeGateProcessor(MultiHookProcessor):
 
     async def on_before_tool(self, event: ToolCallEvent):
         tool = event.tool_name
-        if tool not in {"Read", "Grep", "Glob"}:
+        if tool not in {"Read", "Grep", "Glob", "Bash"}:
             yield event
             return
 
@@ -108,5 +125,22 @@ class ReadScopeGateProcessor(MultiHookProcessor):
                         synthetic_result=self._blocked_msg(path_val),
                     )
                     return
+
+        elif tool == "Bash":
+            cmd = tool_input.get("command", "")
+            if isinstance(cmd, str) and cmd:
+                # Extract every absolute path token from the command and
+                # reject if any resolves under a blocked root. Trusted-agent
+                # scoping — doesn't try to defeat obfuscation.
+                for abs_path_match in _ABS_PATH_RE.finditer(cmd):
+                    candidate = abs_path_match.group(1)
+                    p = _resolve(candidate)
+                    if p is not None and self._is_blocked(p):
+                        yield dataclasses.replace(
+                            event,
+                            approved=False,
+                            synthetic_result=self._blocked_msg(candidate),
+                        )
+                        return
 
         yield event
