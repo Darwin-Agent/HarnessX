@@ -1,0 +1,68 @@
+# HarnessX HarnessConfig (behaviour pipeline — no model)
+# Combine: model_config.agentic(HarnessConfig.from_yaml(this))
+
+tool_registry:
+  builtin:
+  - Bash
+  custom: []
+tracer: null
+processors:
+- _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+  _code_hash: sha256:a5213096e1e5ed10
+  system_builder:
+    _target_: benchmarks.terminal_bench_2.harness._StaticSystemPromptBuilder
+    _code_hash: sha256:ac9cec8620b800d8
+  _hook_: '*'
+- _target_: harnessx.processors.context.env_context_injector.EnvironmentContextInjector
+  _code_hash: sha256:c3a0003e0cdeb057
+  working_dir: /app
+  constraints: {}
+  header: Environment
+  max_tree_lines: 20
+  non_interactive: true
+  inject_integrity_rules: true
+  _hook_: '*'
+- _target_: harnessx.processors.control.tool_call_correction.ToolCallCorrectionLayer
+  _code_hash: sha256:5c8e3bb312fb6dd8
+  tool_schemas: {}
+  _hook_: '*'
+- _target_: benchmarks.terminal_bench_2.harness.TaskTimeReminderProcessor
+  _code_hash: sha256:ca839b8df0220f5c
+  warn_at:
+  - 0.7
+  - 0.9
+  _hook_: '*'
+- _target_: harnessx.processors.control.compaction.CompactionProcessor
+  _code_hash: sha256:479ce2ae4d00a8ee
+  token_threshold: 140000
+  message_threshold: 100
+  retention_window: 6
+  eviction_fraction: 0.5
+  summarize_key: summarize
+  preserve_first_message: true
+  _hook_: '*'
+- _target_: harnessx.processors.control.parse_retry.ParseRetryProcessor
+  _code_hash: sha256:d81a9178188f2908
+  max_consecutive_errors: 1
+  _hook_: '*'
+- _target_: benchmarks.terminal_bench_2.harness.PostCompactionRefreshProcessor
+  _code_hash: sha256:8e71b409502e853f
+  drop_threshold: 5
+  _hook_: '*'
+- _target_: harnessx.processors.control.bg_install_guard.BgInstallGuard
+  _code_hash: sha256:739db4a0bda02dfc
+  _hook_: '*'
+- _target_: benchmarks.terminal_bench_2.harness.CustomEditToolProcessor
+  _code_hash: sha256:6ef4a4be0a8acf7c
+  threshold: 7
+  _hook_: '*'
+- _target_: benchmarks.terminal_bench_2.harness.CustomSelfVerifyProcessor
+  _code_hash: sha256:b5a515a071eb0f5e
+  _hook_: '*'
+workspace: null
+workspace_template: default
+init_workspace: true
+step_snapshots: true
+sandbox_provider: null
+sandbox_hint_id: null
+plugins: []

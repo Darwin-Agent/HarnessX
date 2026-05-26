@@ -1,0 +1,110 @@
+# EvolveAgent harness config
+#
+# Full coding pipeline with SelfVerifyEnforcementProcessor.
+# Runtime injection (per round): workspace — injected via .copy() in orchestrator.
+#
+# Customize by passing a replacement path to EvolOrchestrator:
+#   EvolOrchestrator(evolve_config_yaml=Path("my_evolve.yaml"))
+
+processors:
+  # Context assembly.
+  # DefaultSystemPromptBuilder reads AGENTS.md from workspace root (copied by WorkspaceInitializer).
+  - _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+    system_builder:
+      _target_: harnessx.processors.context.strategies.system_prompt.default.DefaultSystemPromptBuilder
+  - _target_: harnessx.processors.context.env_context_injector.EnvironmentContextInjector
+
+  # Memory: sliding window, compaction-aware.
+  - _target_: harnessx.processors.memory.memory_extraction.MemoryExtractionProcessor
+    memory:
+      _target_: harnessx.processors.memory.strategies.sliding_window.SlidingWindowMemory
+      n: 30
+    threshold: 100000
+  - _target_: harnessx.processors.memory.memory_retrieval.MemoryRetrievalProcessor
+    memory:
+      _target_: harnessx.processors.memory.strategies.sliding_window.SlidingWindowMemory
+      n: 30
+    top_k: 10
+
+  # Loop and reliability guards.
+  - _target_: harnessx.processors.control.loop_detection.LoopDetectionProcessor
+  - _target_: harnessx.processors.control.tool_call_correction.ToolCallCorrectionLayer
+  - _target_: harnessx.processors.control.parse_retry.ParseRetryProcessor
+  - _target_: harnessx.processors.control.tool_failure_guard.ToolFailureGuard
+  - _target_: harnessx.processors.control.repeated_edit_detector.RepeatedFileEditDetector
+
+  # Compaction.
+  - _target_: harnessx.processors.control.compaction.CompactionProcessor
+    token_threshold: 160000
+    retention_window: 4
+    eviction_fraction: 1.0
+    summarize_prompt_template: |
+      You are compacting an EvolveAgent's work history. EvolveAgent reads a DigestAgent
+      failure-pattern report, then designs and writes harness config changes to fix those
+      failures, and finally calls submit_change_manifest with a structured manifest.
+
+      From the messages below, extract a structured summary with these fields:
+
+      FAILURE_PATTERNS: <1–4 bullet points on the key failure patterns EvolveAgent is
+        addressing (from the DigestAgent report). Write "not yet read" if report unread.>
+
+      DECISIONS: <bullet list of config changes already decided or written, e.g.
+        "add LoopDetectionProcessor", "set token_budget=80000". Write "none yet" if none.>
+
+      FILES_WRITTEN: <comma-separated list of files already written/edited, e.g.
+        "target_config.yaml". Write "none" if none.>
+
+      FILES_READ: <comma-separated list of key files already read (config files, report
+        files, etc.) so they are not re-read unnecessarily. Write "none" if none.>
+
+      NOTEBOOK: <absolute path to the evolution notebook. Write "not yet created" if absent.>
+
+      MANIFEST_STATUS: <"not started" | "in progress" | "ready to submit" — based on
+        whether submit_change_manifest has been called or manifest fields are being built.>
+
+      After the four fields add exactly this line:
+      RESUME: Do NOT re-read files already listed in FILES_READ. Check FILES_WRITTEN to
+      see what has already been written. Continue from where work was interrupted.
+
+      Messages to summarize:
+      {conversation}
+  # Completion gate: check artifact existence, validation, and submit_change_manifest call.
+  # required_files is substituted at runtime by build_evolve_config (workspace_dir/target_config.yaml).
+  - _target_: harnessx.experimental.harness_evol.processors.self_validation.SelfValidationProcessor
+    completion_tool: submit_change_manifest
+    required_files: []
+    max_interventions: 8
+
+  # Cross-round notebook and write gate.
+  # notebook_path / allowed_roots / allowed_files are substituted at runtime by build_evolve_config.
+  - _target_: harnessx.experimental.harness_evol.processors.notebook.EvolutionNotebookProcessor
+    notebook_path: ""
+
+  - _target_: harnessx.experimental.harness_evol.processors.write_scope_gate.WriteScopeGateProcessor
+    allowed_roots: []
+    allowed_files: []
+
+  # Convergence reminder — soft nudge at 60% steps, hard-stop message at 85%.
+  - _target_: harnessx.experimental.harness_evol.processors.step_deadline_reminder.StepDeadlineReminderProcessor
+
+  # Guard against template leakage when agent writes .j2 / .yaml processor files.
+  - _target_: harnessx.experimental.harness_evol.processors.leakage_guard.LeakageGuardProcessor
+
+  # Auto-validate processor/tool .py files the agent writes against harnessx contracts.
+  - _target_: harnessx.experimental.harness_evol.processors.contract_autocheck.ContractAutoCheckProcessor
+
+  # Filter apt/pip/npm install progress noise from Bash output.
+  - _target_: harnessx.experimental.harness_evol.processors.tool_result_noise_filter.ToolResultNoiseFilterProcessor
+
+tool_registry:
+  builtin:
+    - Bash
+    - Read
+    - Write
+    - Edit
+    - Glob
+    - Grep
+    - WebFetch
+  custom:
+    - harnessx.experimental.harness_evol.evolve.tools.validate_config.ValidateHarnessConfig
+    - harnessx.experimental.harness_evol.evolve.tools.submit_manifest.submit_change_manifest

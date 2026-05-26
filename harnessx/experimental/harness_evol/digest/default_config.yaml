@@ -1,0 +1,81 @@
+# DigestAgent harness config
+#
+# Analysis pipeline:
+#   - Bash / Read / Glob / Grep  for trace exploration (Bash writes blocked by WriteScopeGateProcessor)
+#   - Write                      for evolution_notebook.md only (gated by WriteScopeGateProcessor)
+#   - submit_digest_report  as structured stop tool
+#
+# System prompt: build_digest_config copies prompts/AGENTS.md into workspace via
+#   WorkspaceInitializer(prompts_root=digest/prompts/); DefaultSystemPromptBuilder reads it.
+# SkillRuntimePlugin auto-discovers workspace.root/skills/ and appends <available_skills>.
+# EvolutionNotebookProcessor injects cross-round notebook context at task_start.
+# WriteScopeGateProcessor restricts Write/Edit/Bash to notebook_path only.
+#
+# Runtime injection (per round): workspace, notebook_path — substituted by build_digest_config.
+# Customize by passing config_yaml= to build_digest_config / EvolOrchestrator.
+
+processors:
+  - _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+    system_builder:
+      _target_: harnessx.processors.context.strategies.system_prompt.default.DefaultSystemPromptBuilder
+
+  - _target_: harnessx.experimental.harness_evol.processors.notebook.EvolutionNotebookProcessor
+    notebook_path: ""
+
+  - _target_: harnessx.processors.control.parse_retry.ParseRetryProcessor
+  - _target_: harnessx.processors.control.tool_call_correction.ToolCallCorrectionLayer
+
+  - _target_: harnessx.experimental.harness_evol.processors.write_scope_gate.WriteScopeGateProcessor
+    allowed_files: []
+
+  # Convergence reminder — soft nudge at 60% steps, hard-stop message at 85%.
+  - _target_: harnessx.experimental.harness_evol.processors.step_deadline_reminder.StepDeadlineReminderProcessor
+
+  # Compact conversation history when input exceeds token_threshold to prevent
+  # context overflow (DigestAgent reads many trajectory files; seen >70k tokens).
+  - _target_: harnessx.processors.control.compaction.CompactionProcessor
+    token_threshold: 160000
+    retention_window: 4
+    eviction_fraction: 1.0
+    preserve_first_message: true
+    summarize_prompt_template: |
+      You are compacting a DigestAgent's work history. DigestAgent reads harness
+      trajectory files and analyses task failure patterns to produce a routing report.
+
+      From the messages below, extract a structured summary with these fields:
+
+      ANALYSED_TASKS: <comma-separated task IDs already fully read/analysed, e.g.
+        "crack-7z-hash, build-pmars". Extract task IDs from file paths like
+        signals/<task_id>.json or trajectory paths. Write "none" if none found.>
+
+      KEY_FINDINGS: <1–4 bullet points on failure patterns or root causes identified
+        so far. Write "none yet" if no findings visible.>
+
+      NOTEBOOK: <absolute path to the evolution notebook file (starts with
+        digest-workspace/ or an absolute path). Write "not yet created" if absent.>
+
+      IN_PROGRESS: <task ID the agent was actively reading/analysing when history
+        was compacted. Write "none" if not identifiable.>
+
+      After the four fields add exactly this line:
+      RESUME: Read the notebook file first to recover full analysis state, then
+      continue with tasks NOT listed in ANALYSED_TASKS.
+
+      Messages to summarize:
+      {conversation}
+
+  # Filter apt/pip/npm install progress noise from Bash output.
+  - _target_: harnessx.experimental.harness_evol.processors.tool_result_noise_filter.ToolResultNoiseFilterProcessor
+
+plugins:
+  - _target_: harnessx.plugins.dimensions.skill_runtime.SkillRuntimePlugin
+
+tool_registry:
+  builtin:
+    - Bash
+    - Read
+    - Glob
+    - Grep
+    - Write
+  custom:
+    - harnessx.experimental.harness_evol.digest.tools.submit_digest_report

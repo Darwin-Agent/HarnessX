@@ -1,0 +1,18 @@
+[
+  "build-cython-ext",
+  "build-pmars",
+  "cobol-modernization",
+  "configure-git-webserver",
+  "count-dataset-tokens",
+  "crack-7z-hash",
+  "git-leak-recovery",
+  "git-multibranch",
+  "headless-terminal",
+  "nginx-request-logging",
+  "pypi-server",
+  "qemu-alpine-ssh",
+  "raman-fitting",
+  "torch-tensor-parallelism",
+  "tune-mjcf",
+  "write-compressor"
+]
