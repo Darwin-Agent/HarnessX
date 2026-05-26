@@ -230,7 +230,7 @@ class CompactionProcessor(MultiHookProcessor):
     ) -> str:
         from ...core.harness import BaseTask
 
-        conv_text = "\n".join(f"[{m.role}] {_extract_text(m.content)[:300]}" for m in messages)
+        conv_text = "\n".join(f"[{m.role}] {_extract_text(m.content)}" for m in messages)
         if self._summarize_prompt_template and "{conversation}" in self._summarize_prompt_template:
             prompt = self._summarize_prompt_template.replace("{conversation}", conv_text)
         elif self._summarize_prompt_template:

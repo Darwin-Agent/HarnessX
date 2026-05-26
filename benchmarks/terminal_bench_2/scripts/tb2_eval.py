@@ -89,6 +89,8 @@ def build_command(
     no_proxy: str | None = None,
     harness_config_yaml: str | None = None,
     verifier_timeout_multiplier: float | None = None,
+    n_attempts: int | None = None,
+    extra_ak: list[str] | None = None,
 ) -> list[str]:
     cmd = [
         "harbor",
@@ -143,6 +145,10 @@ def build_command(
         cmd += ["--ak", f"harness_config_yaml={harness_config_yaml}"]
     if verifier_timeout_multiplier is not None:
         cmd += ["--verifier-timeout-multiplier", str(verifier_timeout_multiplier)]
+    if n_attempts is not None:
+        cmd += ["--n-attempts", str(n_attempts)]
+    for kv in (extra_ak or []):
+        cmd += ["--ak", kv]
 
     for name in task_names:
         cmd += ["--task-name", name]
@@ -281,13 +287,29 @@ def main() -> None:
         "Useful for slow tasks like pytorch-model-recovery that exceed the default 900s.",
     )
     parser.add_argument(
+        "--n-attempts",
+        type=int,
+        default=None,
+        metavar="K",
+        help="Number of attempts per trial (harbor -k / --n-attempts, default: 1)",
+    )
+    parser.add_argument(
+        "--ak",
+        action="append",
+        dest="extra_ak",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Extra agent kwargs forwarded to harbor run --ak (repeatable). "
+        "E.g. --ak temperature=1.0 --ak top_p=0.95",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print the harbor command without running it",
     )
     args = parser.parse_args()
 
-    jobs_dir_path = PROJECT_ROOT / args.jobs_dir
+    jobs_dir_path = (PROJECT_ROOT / args.jobs_dir).resolve()
     jobs_dir = str(jobs_dir_path)
 
     # ── Resume: detect already-completed tasks ────────────────────────────────
@@ -329,6 +351,8 @@ def main() -> None:
         no_proxy=args.no_proxy,
         harness_config_yaml=harness_config_yaml,
         verifier_timeout_multiplier=args.verifier_timeout_multiplier,
+        n_attempts=args.n_attempts,
+        extra_ak=args.extra_ak or None,
     )
 
     print("Harbor command:")

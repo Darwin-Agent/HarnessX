@@ -264,16 +264,29 @@ class OpenAIProvider(BaseModelProvider):
         if self.stream:
             return await self._complete_streaming(client, oai_messages, kwargs, max_retries, base_delay)
 
+        # Extract wall-clock timeout for asyncio.wait_for (httpx read_timeout is
+        # per-chunk and will NOT fire on long-running chunked streaming responses).
+        _total_timeout = kwargs.pop("timeout", None)
+
         for attempt in range(1, max_retries + 1):
             try:
                 await _throttle()
-                response = await client.chat.completions.create(
+                _coro = client.chat.completions.create(
                     model=self.model,
                     messages=oai_messages,
                     max_tokens=self.max_tokens,
                     **kwargs,
                 )
+                if _total_timeout is not None:
+                    response = await asyncio.wait_for(_coro, timeout=float(_total_timeout))
+                else:
+                    response = await _coro
                 break
+            except asyncio.TimeoutError:
+                raise TimeoutError(
+                    f"Request exceeded total timeout of {_total_timeout}s "
+                    "(model generation too slow)"
+                )
             except Exception as e:
                 status = getattr(e, "status_code", None) or getattr(e, "status", None)
                 err_str = str(e).lower()
@@ -336,6 +349,9 @@ class OpenAIProvider(BaseModelProvider):
         import json as _json
         import re as _re
 
+        # Extract wall-clock timeout (same semantics as non-streaming path).
+        _total_timeout = kwargs.pop("timeout", None)
+
         for attempt in range(1, max_retries + 1):
             try:
                 await _throttle()
@@ -363,47 +379,74 @@ class OpenAIProvider(BaseModelProvider):
                     raise
 
         content_parts: list[str] = []
+        reasoning_parts: list[str] = []
         finish_reason = "stop"
         input_tokens = 0
         output_tokens = 0
         # tool_calls accumulator: index -> {id, name, arguments_parts}
         tc_accum: dict[int, dict] = {}
 
-        async for chunk in stream:
-            if chunk.usage:
-                input_tokens = chunk.usage.prompt_tokens or 0
-                output_tokens = chunk.usage.completion_tokens or 0
+        async def _consume_stream():
+            nonlocal finish_reason, input_tokens, output_tokens
+            async for chunk in stream:
+                if chunk.usage:
+                    input_tokens = chunk.usage.prompt_tokens or 0
+                    output_tokens = chunk.usage.completion_tokens or 0
 
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            if chunk.choices[0].finish_reason:
-                finish_reason = chunk.choices[0].finish_reason
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if chunk.choices[0].finish_reason:
+                    finish_reason = chunk.choices[0].finish_reason
 
-            if delta.content:
-                content_parts.append(delta.content)
+                if delta.content:
+                    content_parts.append(delta.content)
 
-            if delta.tool_calls:
-                for tc_delta in delta.tool_calls:
-                    idx = tc_delta.index
-                    if idx not in tc_accum:
-                        tc_accum[idx] = {"id": "", "name": "", "arguments_parts": []}
-                    if tc_delta.id:
-                        tc_accum[idx]["id"] = tc_delta.id
-                    if tc_delta.function:
-                        if tc_delta.function.name:
-                            tc_accum[idx]["name"] = tc_delta.function.name
-                        if tc_delta.function.arguments:
-                            tc_accum[idx]["arguments_parts"].append(tc_delta.function.arguments)
+                # vllm returns reasoning tokens as delta.reasoning (MiMo, DeepSeek-R1 style)
+                # Some SDKs expose it as reasoning_content; check both.
+                _reasoning_chunk = (
+                    getattr(delta, "reasoning", None)
+                    or getattr(delta, "reasoning_content", None)
+                )
+                if _reasoning_chunk:
+                    reasoning_parts.append(_reasoning_chunk)
+
+                if delta.tool_calls:
+                    for tc_delta in delta.tool_calls:
+                        idx = tc_delta.index
+                        if idx not in tc_accum:
+                            tc_accum[idx] = {"id": "", "name": "", "arguments_parts": []}
+                        if tc_delta.id:
+                            tc_accum[idx]["id"] = tc_delta.id
+                        if tc_delta.function:
+                            if tc_delta.function.name:
+                                tc_accum[idx]["name"] = tc_delta.function.name
+                            if tc_delta.function.arguments:
+                                tc_accum[idx]["arguments_parts"].append(tc_delta.function.arguments)
+
+        if _total_timeout is not None:
+            try:
+                await asyncio.wait_for(_consume_stream(), timeout=float(_total_timeout))
+            except asyncio.TimeoutError:
+                raise TimeoutError(
+                    f"Streaming request exceeded total timeout of {_total_timeout}s "
+                    "(model generation too slow)"
+                )
+        else:
+            await _consume_stream()
 
         full_content = "".join(content_parts)
 
         # Strip <think>...</think> blocks (QwQ-32B reasoning) → move to thinking field
-        thinking = ""
-        think_match = _re.search(r"<think>(.*?)</think>", full_content, _re.DOTALL)
-        if think_match:
-            thinking = think_match.group(1).strip()
-            full_content = _re.sub(r"<think>.*?</think>", "", full_content, flags=_re.DOTALL).strip()
+        # For vllm/MiMo style, reasoning_parts already collected separately above.
+        if reasoning_parts:
+            thinking = "".join(reasoning_parts)
+        else:
+            thinking = ""
+            think_match = _re.search(r"<think>(.*?)</think>", full_content, _re.DOTALL)
+            if think_match:
+                thinking = think_match.group(1).strip()
+                full_content = _re.sub(r"<think>.*?</think>", "", full_content, flags=_re.DOTALL).strip()
 
         # Build tool calls from accumulated deltas
         from ..core.events import ToolCall

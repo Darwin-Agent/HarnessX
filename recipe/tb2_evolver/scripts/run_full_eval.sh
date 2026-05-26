@@ -23,26 +23,24 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 EVAL_SCRIPT="$REPO_ROOT/benchmarks/terminal_bench_2/scripts/eval_local_docker.sh"
-ENV_FILE="$REPO_ROOT/recipe/tb2_evolver/.env"
+DEFAULT_ENV_FILE="$REPO_ROOT/recipe/tb2_evolver/.env"
 DEFAULT_TASKS_JSON="$SCRIPT_DIR/../tasks_all_tb2.json"
-
-# ── Load .env early so all vars (TB2_*, CONCURRENT, …) are available ──────────
-if [[ -f "$ENV_FILE" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +a
-fi
 
 # ── Parse script-level args ───────────────────────────────────────────────────
 HARNESS_CONFIG=""
 TASKS_JSON="$DEFAULT_TASKS_JSON"
+ENV_FILE="$DEFAULT_ENV_FILE"
 PASSTHROUGH=()
 HAS_N=false
 HAS_JOB=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --env-file)
+      [[ $# -ge 2 ]] || { echo "ERROR: --env-file requires a path" >&2; exit 1; }
+      ENV_FILE="$2"
+      shift 2
+      ;;
     --config)
       [[ $# -ge 2 ]] || { echo "ERROR: --config requires a path" >&2; exit 1; }
       HARNESS_CONFIG="$2"
@@ -69,6 +67,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# ── Load env file so all vars (TB2_*, CONCURRENT, …) are available ────────────
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
 
 # ── Validate ──────────────────────────────────────────────────────────────────
 if [[ -z "$HARNESS_CONFIG" ]]; then

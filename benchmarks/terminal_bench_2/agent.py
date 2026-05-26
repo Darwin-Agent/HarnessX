@@ -44,6 +44,8 @@ class HarnessXAgent(BaseAgent):
         max_steps: int = MAX_STEPS,
         request_timeout_sec: int = REQUEST_TIMEOUT_SEC,
         max_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
         harness_config_yaml: str | None = None,
         **kwargs,
     ):
@@ -54,6 +56,8 @@ class HarnessXAgent(BaseAgent):
         self._max_steps = int(max_steps)
         self._request_timeout_sec = int(request_timeout_sec)
         self._max_tokens = int(max_tokens) if max_tokens is not None else None
+        self._temperature = float(temperature) if temperature is not None else None
+        self._top_p = float(top_p) if top_p is not None else None
         # Optional path to an evolved HarnessConfig YAML.  When set, the
         # processor pipeline is loaded from this file; runtime slots are
         # injected at run time via .copy().
@@ -121,6 +125,11 @@ class HarnessXAgent(BaseAgent):
                 provider_kwargs["base_url"] = self._api_base
             if self._extra_headers:
                 provider_kwargs["extra_headers"] = self._extra_headers
+            if self._temperature is not None:
+                provider_kwargs["temperature"] = self._temperature
+            if self._top_p is not None:
+                provider_kwargs["top_p"] = self._top_p
+            provider_kwargs["timeout"] = float(self._request_timeout_sec)
             provider = OpenAIProvider(model=model, **provider_kwargs)
 
         # ── Resolve task timeout ──────────────────────────────────────────────
@@ -142,6 +151,17 @@ class HarnessXAgent(BaseAgent):
         # are never serialised into the config YAML.
         if self._harness_config_yaml:
             base_config = HarnessConfig.from_yaml_file(self._harness_config_yaml)
+            # Inject runtime task_timeout into time-aware processors that were
+            # serialised without timeout_seconds (YAML has no runtime values).
+            # config.processors is a list of dicts with '_target_' keys.
+            _timeout_targets = {
+                "benchmarks.terminal_bench_2.harness.TaskTimeReminderProcessor",
+                "harnessx.processors.context.env_context_injector.EnvironmentContextInjector",
+            }
+            for proc_dict in base_config.processors:
+                if isinstance(proc_dict, dict) and proc_dict.get("_target_") in _timeout_targets:
+                    if proc_dict.get("timeout_seconds") is None:
+                        proc_dict["timeout_seconds"] = task_timeout
         else:
             base_config = make_tb2_harness_config(timeout_seconds=task_timeout)
 

@@ -94,7 +94,6 @@ class ProgressiveSkillLoader(MultiHookProcessor):
         self._indexes: dict[tuple, SkillIndex] = {}
         self._content_cache: dict[Path, str] = {}
         self._cached_workspace = None
-        self._cached_raw_messages: tuple = ()
 
     def _get_index(self, skills_dir: Path | None, extra_dirs: list[Path] | None = None) -> SkillIndex:
         # Cache key includes extra_dirs so a change in plugin set busts the cache.
@@ -161,13 +160,18 @@ class ProgressiveSkillLoader(MultiHookProcessor):
             yield event
 
     async def on_step_start(self, event: StepStartEvent):
-        """Cache workspace and raw_messages for use in on_before_model."""
+        """Cache workspace for use in on_before_model."""
         self._cached_workspace = event.workspace
-        self._cached_raw_messages = event.raw_messages
         yield event
 
     async def on_before_model(self, event: BeforeModelEvent):
         """Inject full content of query-matched skills as a user message."""
+        # Only inject when the last message is a user turn.
+        # Mid-tool-chain steps (last message is tool/assistant) are skipped.
+        if not event.messages or event.messages[-1].role != "user":
+            yield event
+            return
+
         workspace = self._cached_workspace
         skills_dir = self._resolve_skills_dir(workspace)
         # Preserve prior behavior: skip when nothing is configured anywhere.
@@ -199,25 +203,12 @@ class ProgressiveSkillLoader(MultiHookProcessor):
             yield event
             return
 
-        logger.info(
+        logger.debug(
             "SkillLoader: %d/%d skills available in %s",
             len(skills),
             len(all_skills),
             skills_dir,
         )
-
-        # Only inject at the start of a new user turn, not mid-task after tool calls.
-        # When the last raw message is tool/assistant, the model is continuing an
-        # in-progress chain — injecting skills docs here confuses it into responding
-        # to the docs instead of completing the task.
-        raw = self._cached_raw_messages
-        if raw and raw[-1].role != "user":
-            logger.info(
-                "SkillLoader: skipping (last raw_message role=%s, not user)",
-                raw[-1].role,
-            )
-            yield event
-            return
 
         query = _last_user_text(event.messages)
         block = self._build_full_block(skills, query)
@@ -237,10 +228,10 @@ class ProgressiveSkillLoader(MultiHookProcessor):
                 matched,
                 query[:80],
             )
-            yield dataclasses.replace(
-                event,
-                messages=event.messages + (Message(role="user", content=block.strip()),),
-            )
+            last = event.messages[-1]
+            merged = _extract_text(last.content) + "\n\n" + block.strip()
+            new_messages = event.messages[:-1] + (dataclasses.replace(last, content=merged),)
+            yield dataclasses.replace(event, messages=new_messages)
         else:
             logger.info(
                 "SkillLoader: no skills matched query=%r (min_score=%d)",

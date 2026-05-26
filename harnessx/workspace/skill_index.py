@@ -2,8 +2,18 @@
 # SPDX-License-Identifier: MIT
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
+
+
+def _find_skill_mds(root: Path) -> list[Path]:
+    """Recursively find all SKILL.md files under *root*, following symlinks."""
+    found: list[Path] = []
+    for dirpath, _dirs, files in os.walk(root, followlinks=True):
+        if "SKILL.md" in files:
+            found.append(Path(dirpath) / "SKILL.md")
+    return sorted(found)
 
 
 @dataclass
@@ -55,7 +65,7 @@ def expand_skill_roots(roots: list[Path] | None) -> list[Path]:
         root = Path(root)
         if not root.is_dir():
             continue
-        for skill_md in sorted(root.rglob("SKILL.md")):
+        for skill_md in _find_skill_mds(root):
             dirs.append(skill_md.parent)
     return dirs
 
@@ -133,7 +143,7 @@ class SkillIndex:
 
         # Primary: recursively scan skills_dir
         if self.skills_dir.exists():
-            for skill_md in sorted(self.skills_dir.rglob("SKILL.md")):
+            for skill_md in _find_skill_mds(self.skills_dir):
                 fm = _parse_frontmatter(skill_md)
                 name = fm.get("name")
                 if not name or name in seen:

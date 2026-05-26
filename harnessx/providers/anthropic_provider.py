@@ -19,6 +19,15 @@ _log = logging.getLogger(__name__)
 _RL_MAX_RETRIES = 5
 _RL_BACKOFF = (15.0, 30.0, 60.0, 120.0, 240.0)  # seconds per attempt
 
+# Retry config for timeout errors (ReadTimeout / APITimeoutError).
+# Retry immediately — timeouts are usually transient server hangs.
+_TO_MAX_RETRIES = 3
+_TO_BACKOFF = (0.0, 2.0, 5.0)  # seconds per attempt
+
+# Default per-request timeout in seconds.  The Anthropic SDK default is 600s
+# which causes very long hangs on proxy timeouts.  300s is a safer ceiling.
+_DEFAULT_TIMEOUT = 300.0
+
 
 class AnthropicProvider(AgenticMixin, BaseModelProvider):
     """Direct Anthropic SDK provider. Supports Extended Thinking."""
@@ -44,7 +53,7 @@ class AnthropicProvider(AgenticMixin, BaseModelProvider):
         self.thinking_budget_tokens = thinking_budget_tokens
         self._api_key = api_key
         self._base_url = base_url
-        self._timeout = timeout or request_timeout
+        self._timeout = timeout or request_timeout or _DEFAULT_TIMEOUT
         self._default_headers = default_headers
         self.kwargs = kwargs
 
@@ -156,6 +165,7 @@ class AnthropicProvider(AgenticMixin, BaseModelProvider):
         use_streaming = stream_callback is not None or self.extended_thinking or effective_max > _STREAMING_THRESHOLD
 
         _last_exc: Exception | None = None
+        _to_attempt = 0
         for attempt in range(_RL_MAX_RETRIES + 1):
             try:
                 if use_streaming:
@@ -212,6 +222,23 @@ class AnthropicProvider(AgenticMixin, BaseModelProvider):
                     exc,
                 )
                 await asyncio.sleep(delay)
+            except anthropic.APITimeoutError as exc:
+                _last_exc = exc
+                if _to_attempt >= _TO_MAX_RETRIES:
+                    raise
+                delay = _TO_BACKOFF[min(_to_attempt, len(_TO_BACKOFF) - 1)]
+                _log.warning(
+                    "AnthropicProvider: timeout on attempt %d/%d, retrying in %.0fs — %s",
+                    _to_attempt + 1,
+                    _TO_MAX_RETRIES,
+                    delay,
+                    exc,
+                )
+                _to_attempt += 1
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                # don't increment `attempt` so rate-limit budget is unaffected
+                continue
 
         content_text = ""
         thinking_text = ""

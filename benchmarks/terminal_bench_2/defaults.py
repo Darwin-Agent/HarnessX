@@ -5,7 +5,7 @@ WORKSPACE_PATH = "/app"  # task files live at /app inside the container
 # ── RunLoop ───────────────────────────────────────────────────────────────────
 MAX_STEPS = 500  # effectively unlimited; Harbor task.toml controls wall-clock
 REQUEST_TIMEOUT_SEC = 600  # per-LLM-call timeout (seconds); override via --ak request_timeout_sec
-TOKEN_BUDGET = 10_000_000  # cumulative token cap across all steps
+TOKEN_BUDGET = None  # no cumulative token cap; wall-clock timeout from Harbor task.toml controls termination
 
 # ── Model provider ────────────────────────────────────────────────────────────
 API_KEY_DEFAULT = "EMPTY"

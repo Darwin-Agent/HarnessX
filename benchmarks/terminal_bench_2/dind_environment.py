@@ -47,14 +47,54 @@ from harbor.models.trial.paths import TrialPaths
 
 
 def _dind_host_path(container_path: str) -> str:
+    """Translate a container-side path to its host-visible equivalent.
+
+    For paths that live on a non-overlay filesystem (e.g. a block device
+    bind-mounted at /data), the host sees the same path directly — no
+    translation required.  Only apply the overlay-upperdir trick when the
+    path belongs to the container's own overlay layer.
+    """
     try:
         with open("/proc/self/mountinfo") as f:
-            for line in f:
-                if "/ / " in line and "overlay" in line and "upperdir=" in line:
-                    m = re.search(r"upperdir=([^,\s)]+)", line)
-                    if m:
-                        return m.group(1).rstrip("/") + container_path.rstrip("/")
-    except OSError:
+            lines = f.readlines()
+
+        # Build a map: mountpoint -> fstype, for all mounts
+        mounts: list[tuple[str, str]] = []
+        overlay_upperdir: str | None = None
+        for line in lines:
+            parts = line.split()
+            if len(parts) < 7:
+                continue
+            mountpoint = parts[4]
+            try:
+                dash = parts.index("-")
+            except ValueError:
+                continue
+            fstype = parts[dash + 1] if dash + 1 < len(parts) else ""
+            if fstype == "overlay" and mountpoint == "/" and "upperdir=" in line:
+                m = re.search(r"upperdir=([^,\s)]+)", line)
+                if m:
+                    overlay_upperdir = m.group(1).rstrip("/")
+            else:
+                mounts.append((mountpoint, fstype))
+
+        # Find the longest non-overlay mountpoint that is a prefix of container_path
+        norm = container_path.rstrip("/")
+        best: str | None = None
+        for mp, _ in mounts:
+            if norm == mp or norm.startswith(mp.rstrip("/") + "/"):
+                if best is None or len(mp) > len(best):
+                    best = mp
+
+        # If the path is under a non-overlay mount, it's directly visible on the host
+        if best is not None:
+            return container_path
+
+        # Fall back to overlay-upperdir translation (path lives in container layer)
+        if overlay_upperdir:
+            return overlay_upperdir + norm
+
+    except (OSError, ValueError):
         pass
     return container_path
 
@@ -104,16 +144,35 @@ class DinDDockerEnvironment(DockerEnvironment):
         # Propagate proxy settings from the host into every container exec()
         # call (including the verifier's test.sh).  harbor's exec() merges
         # _persistent_env into each `docker compose exec -e KEY=VAL …` call.
+        _LOCALHOST_NO_PROXY = "localhost,127.0.0.1,::1"
         for var in ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"):
             val = os.environ.get(var)
             if val:
                 self._persistent_env[var] = val
+        # Always ensure localhost/127.0.0.1 bypass the proxy inside the container.
+        # Tasks often start local services (nginx, pypi-server, etc.) that the
+        # verifier then connects to via http://localhost:<port>; without this,
+        # those requests are routed through the external proxy and fail.
+        if self._persistent_env.get("http_proxy") or self._persistent_env.get("HTTP_PROXY"):
+            for no_proxy_var in ("no_proxy", "NO_PROXY"):
+                existing = self._persistent_env.get(no_proxy_var, "")
+                if existing:
+                    self._persistent_env[no_proxy_var] = f"{existing},{_LOCALHOST_NO_PROXY}"
+                else:
+                    self._persistent_env[no_proxy_var] = _LOCALHOST_NO_PROXY
 
         self._warm_image = f"{self._WARM_PREFIX}/{environment_name}:latest"
         self._warm_image_preexisted = False
         # Set to True when the patcher leaves install commands un-skipped (they
         # actually ran during this verifier pass), so stop() knows to re-commit.
         self._patcher_had_unskipped_installs = False
+
+        # Container ID cached after start() — used by the exec-cancel watchdog
+        # to issue plain `docker exec` (not docker compose exec) kill commands,
+        # bypassing any hung docker-compose-exec connections.
+        self._container_id: str | None = None
+        # Keep references so watchdog tasks aren't GC'd before they finish.
+        self._watchdog_tasks: set[asyncio.Task] = set()
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
@@ -154,6 +213,92 @@ class DinDDockerEnvironment(DockerEnvironment):
             if line:
                 return line
         return None
+
+    async def _exec_cancel_watchdog(self, grace_sec: float = 60.0) -> None:
+        """Background task: kill stuck process group if the container is still
+        running ``grace_sec`` seconds after an exec() CancelledError.
+
+        Uses plain ``docker exec`` (not docker compose exec) so it succeeds even
+        when existing docker-compose-exec connections are hung on a full pipe.
+        Targets only the process group stored in ``/tmp/_hx_exec_pgid`` — the
+        setsid group created by HarborSandbox for each agent command — so
+        ``sleep infinity`` (PID 1/2) is untouched and the container stays alive.
+        """
+        try:
+            await asyncio.sleep(grace_sec)
+        except asyncio.CancelledError:
+            return
+
+        cid = self._container_id
+        if not cid:
+            return
+
+        # Confirm the container is still running before taking action.
+        # On timeout or error, fall through rather than returning — if the
+        # container is already stopped, docker kill will fail harmlessly.
+        try:
+            rc, state = await asyncio.wait_for(
+                _docker("inspect", "--format", "{{.State.Running}}", cid),
+                timeout=5.0,
+            )
+            if rc != 0 or state.strip() != "true":
+                return
+        except (asyncio.TimeoutError, Exception) as exc:
+            self.logger.warning("exec-watchdog: inspect failed (%s) — proceeding with kill attempt", exc)
+
+        self.logger.warning(
+            "exec-watchdog: container %s still running %.0fs after cancel "
+            "— killing stuck process group via direct docker exec",
+            cid[:12], grace_sec,
+        )
+
+        # Kill via direct docker exec: read the PID stored by HarborSandbox's
+        # setsid wrapper and send SIGKILL to the entire process group.
+        # If no pgid file exists (verifier is hung, not an agent command), fall
+        # back to docker kill — this uses the Docker API and bypasses any hung
+        # docker-compose-exec pipe connections.
+        pgid_killed = False
+        try:
+            rc2, out2 = await asyncio.wait_for(
+                _docker(
+                    "exec", cid, "sh", "-c",
+                    "_p=$(cat /tmp/_hx_exec_pgid 2>/dev/null); "
+                    "[ -n \"$_p\" ] || { echo 'no pgid file'; exit 0; }; "
+                    "kill -9 -\"$_p\" 2>/dev/null; "
+                    "rm -f /tmp/_hx_exec_pgid; "
+                    "echo \"killed group $_p\"",
+                ),
+                timeout=10.0,
+            )
+            self.logger.warning("exec-watchdog: rc=%d %s", rc2, out2)
+            pgid_killed = "killed group" in (out2 or "")
+        except asyncio.TimeoutError:
+            self.logger.warning("exec-watchdog: docker exec timed out — container may be unresponsive")
+        except Exception as exc:
+            self.logger.warning("exec-watchdog: %s", exc)
+
+        # No pgid file means this is a hung verifier (not an agent command).
+        # docker compose exec is blocked on a full pipe and cannot be unblocked
+        # from inside the container.  Use docker kill (Docker API, no exec pipe)
+        # to forcibly stop the container so harbor's docker compose down can
+        # proceed.  The container is already being torn down by harbor's timeout
+        # handler — killing it early is safe and unblocks the entire eval.
+        if not pgid_killed:
+            self.logger.warning(
+                "exec-watchdog: no pgid found — verifier likely hung; "
+                "issuing docker kill %s to unblock docker compose down",
+                cid[:12],
+            )
+            try:
+                rc3, out3 = await asyncio.wait_for(
+                    _docker("kill", cid),
+                    timeout=10.0,
+                )
+                self.logger.warning(
+                    "exec-watchdog: docker kill %s rc=%d %s", cid[:12], rc3, out3
+                )
+            except (asyncio.TimeoutError, Exception) as exc:
+                self.logger.warning("exec-watchdog: docker kill failed: %s", exc)
 
     async def _commit_to_warm_image(self) -> None:
         """Restore /app to initial state, then commit the container as the warm image.
@@ -228,9 +373,9 @@ for line in lines:
         out.append(line)
         continue
 
-    # apt-get update — skip if package lists were refreshed within last 24 h
+    # apt-get update — skip on warm image (packages already present) or if lists fresh
     if re.match(r'apt-get\s+update\b', s):
-        if _sh('find /var/lib/apt/lists -maxdepth 1 -name "*.InRelease"'
+        if IS_WARM or _sh('find /var/lib/apt/lists -maxdepth 1 -name "*.InRelease"'
                ' -mmin -1440 2>/dev/null | grep -q .') == 0:
             out.append('# [warm-cache] apt lists fresh — skipped: ' + s)
             skipped.append('apt-get-update')
@@ -241,7 +386,7 @@ for line in lines:
     if m:
         pkgs = [p for p in re.sub(r'apt-get\s+install\s+', '', s).split()
                 if not p.startswith('-')]
-        if pkgs and all(_apt_installed(p) for p in pkgs):
+        if IS_WARM or (pkgs and all(_apt_installed(p) for p in pkgs)):
             out.append('# [warm-cache] apt packages present — skipped: ' + s)
             skipped.append('apt:' + ','.join(pkgs))
             continue
@@ -329,7 +474,7 @@ while IFS= read -r line; do
     s=$(echo "$line" | sed 's/^[[:space:]]*//')
     case "$s" in
         apt-get\ update*)
-            if _apt_lists_fresh; then
+            if [ "$IS_WARM" = "1" ] || _apt_lists_fresh; then
                 echo "# [warm-cache] apt lists fresh — skipped: $line"
                 patched=1; continue
             fi;;
@@ -380,16 +525,19 @@ done < test.sh > test.sh.warm_tmp && mv test.sh.warm_tmp test.sh
             )
             has_python3 = "YES" in (py_check.stdout or "")
 
+            is_warm = int(self._warm_image_preexisted)
             if has_python3:
                 # Patcher runs dpkg/pip/find checks per install line; 60s covers
                 # even test.sh files with many install commands.
+                patcher = f"IS_WARM = {is_warm}\n" + self._PATCHER_SCRIPT
                 result = await self.exec(
-                    f"python3 -c {shlex.quote(self._PATCHER_SCRIPT)}",
+                    f"python3 -c {shlex.quote(patcher)}",
                     timeout_sec=60,
                 )
             else:
+                patcher = f"IS_WARM={is_warm}\n" + self._PATCHER_SHELL
                 result = await self.exec(
-                    f"sh -c {shlex.quote(self._PATCHER_SHELL)}",
+                    f"sh -c {shlex.quote(patcher)}",
                     timeout_sec=60,
                 )
             out = (result.stdout or "").strip()
@@ -446,6 +594,19 @@ done < test.sh > test.sh.warm_tmp && mv test.sh.warm_tmp test.sh
             return await super().exec(command, cwd=cwd, env=env, timeout_sec=timeout_sec, user=user)
         except asyncio.CancelledError:
             self.logger.warning("exec() cancelled — timeout enforced by caller")
+            # Spawn a background watchdog: if the container is still alive 60s
+            # from now, kill the stuck process group via direct docker exec.
+            # This handles the case where docker-compose-exec is hung on a full
+            # pipe (e.g. agent submitted code with an infinite-loop printf) and
+            # harbor's own kill-exec is therefore also blocked.
+            try:
+                task = asyncio.get_running_loop().create_task(
+                    self._exec_cancel_watchdog(grace_sec=60.0)
+                )
+                self._watchdog_tasks.add(task)
+                task.add_done_callback(self._watchdog_tasks.discard)
+            except RuntimeError:
+                pass  # no running loop (shouldn't happen, but be safe)
             raise
 
     async def _verifier_completed(self) -> bool:
@@ -471,7 +632,18 @@ done < test.sh > test.sh.warm_tmp && mv test.sh.warm_tmp test.sh
             # start() selects the prebuilt compose path and the right image name.
             self.task_env_config.docker_image = self._warm_image
             self._env_vars.prebuilt_image_name = self._warm_image
+            # Warm image has all packages pre-installed — no external downloads
+            # needed, so proxy env vars serve no purpose and may slow commands.
+            for _var in ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                         "http_proxy", "https_proxy", "no_proxy"):
+                self._persistent_env.pop(_var, None)
         await super().start(force_build)
+        # Cache container ID now while docker compose is healthy — the watchdog
+        # uses this to issue plain `docker exec` without going through compose.
+        try:
+            self._container_id = await self._get_container_id()
+        except Exception:
+            pass
         # Snapshot /app immediately after the container is up and before the
         # agent touches anything — used by stop() to clean up before committing.
         try:
@@ -480,6 +652,11 @@ done < test.sh > test.sh.warm_tmp && mv test.sh.warm_tmp test.sh
             self.logger.warning("warm-cache: /app snapshot raised %s", exc)
 
     async def stop(self, delete: bool) -> None:
+        # Cancel any pending watchdog tasks — the container is being torn down.
+        for task in list(self._watchdog_tasks):
+            task.cancel()
+        self._watchdog_tasks.clear()
+
         # Only commit when the verifier ran to completion (reward.txt written).
         # This prevents committing a "dirty" image from a trial that was
         # cancelled or timed out before the verifier finished installing deps.
