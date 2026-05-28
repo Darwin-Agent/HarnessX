@@ -24,6 +24,7 @@ Multi-ship is only valid when each shipped candidate's bucket is
 DISJOINT from the others. Stage 4 enforces that constraint before
 calling this function.
 """
+
 from __future__ import annotations
 
 import copy
@@ -41,9 +42,11 @@ def _is_system_prompt(proc: dict) -> bool:
 def _apply_prompt(base: dict, candidate: dict, parent: dict) -> None:
     """Copy the candidate's SystemPromptProcessor template_path into base.
 
-    ``parent`` is unused here — prompt bucket only swaps a single template_path.
+    Falls back to _apply_config-style kwarg diffing when no template_path
+    change is detected — this handles Evolvers that mutate prompt content
+    via AppendSystemPromptProcessor.prompt_path or similar non-template_path
+    patterns.
     """
-    del parent  # signature uniform across appliers
     cand_tp = None
     for p in candidate.get("processors", []) or []:
         if isinstance(p, dict) and _is_system_prompt(p):
@@ -52,13 +55,17 @@ def _apply_prompt(base: dict, candidate: dict, parent: dict) -> None:
                 cand_tp = sb.get("template_path")
                 if cand_tp:
                     break
-    if not cand_tp:
-        return
-    for bp in base.get("processors", []) or []:
-        if isinstance(bp, dict) and _is_system_prompt(bp):
-            sb = bp.setdefault("system_builder", {})
-            if isinstance(sb, dict):
-                sb["template_path"] = cand_tp
+    if cand_tp:
+        for bp in base.get("processors", []) or []:
+            if isinstance(bp, dict) and _is_system_prompt(bp):
+                sb = bp.setdefault("system_builder", {})
+                if isinstance(sb, dict):
+                    sb["template_path"] = cand_tp
+    else:
+        # No template_path swap found — fall through to config-style kwarg
+        # diffing so AppendSystemPromptProcessor.prompt_path changes and
+        # similar patterns are still applied to the base.
+        _apply_config(base, candidate, parent)
 
 
 def _apply_tools(base: dict, candidate: dict, parent: dict) -> None:
@@ -138,16 +145,10 @@ def _apply_processor(base: dict, candidate: dict, parent: dict) -> None:
     added that aren't already present in base.
     """
     parent_targets = {
-        p.get("_target_")
-        for p in (parent.get("processors") or [])
-        if isinstance(p, dict) and p.get("_target_")
+        p.get("_target_") for p in (parent.get("processors") or []) if isinstance(p, dict) and p.get("_target_")
     }
     cand_procs = candidate.get("processors") or []
-    cand_targets = {
-        p.get("_target_")
-        for p in cand_procs
-        if isinstance(p, dict) and p.get("_target_")
-    }
+    cand_targets = {p.get("_target_") for p in cand_procs if isinstance(p, dict) and p.get("_target_")}
 
     removed_targets = parent_targets - cand_targets
     added_targets = cand_targets - parent_targets
@@ -157,14 +158,9 @@ def _apply_processor(base: dict, candidate: dict, parent: dict) -> None:
         return
 
     if removed_targets:
-        base_procs[:] = [
-            p for p in base_procs
-            if not (isinstance(p, dict) and p.get("_target_") in removed_targets)
-        ]
+        base_procs[:] = [p for p in base_procs if not (isinstance(p, dict) and p.get("_target_") in removed_targets)]
 
-    existing = {
-        p.get("_target_") for p in base_procs if isinstance(p, dict)
-    }
+    existing = {p.get("_target_") for p in base_procs if isinstance(p, dict)}
     for cp in cand_procs:
         if not isinstance(cp, dict):
             continue

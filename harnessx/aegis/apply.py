@@ -12,6 +12,7 @@ Additionally, for prompt-bucket candidates, the applied YAML MUST reference a
 — otherwise the change is a silent no-op (R_{n+1} would run against the
 unchanged shared template).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -48,20 +49,23 @@ def _is_inside(p: Path, root: Path) -> bool:
 
 
 def _collect_template_paths(cfg) -> set[str]:
-    """Return all ``template_path`` strings referenced by the applied cfg.
+    """Return all path-like strings referenced by the applied cfg.
 
     Walks both the serialized ``processors`` list (dicts and nested dicts)
     and the runtime ``_rt_procs`` list (builder attribute access).
+    Collects any field whose name ends in ``_path`` (e.g. ``template_path``,
+    ``prompt_path``, ``rules_path``) so Evolvers that use non-standard
+    field names still pass the scratch-dir membership check.
     """
     paths: set[str] = set()
 
     def _visit(node) -> None:
         if isinstance(node, dict):
-            v = node.get("template_path")
-            if isinstance(v, str) and v:
-                paths.add(v)
-            for sub in node.values():
-                _visit(sub)
+            for k, v in node.items():
+                if isinstance(k, str) and k.endswith("_path") and isinstance(v, str) and v:
+                    paths.add(v)
+                else:
+                    _visit(v)
         elif isinstance(node, list):
             for sub in node:
                 _visit(sub)
@@ -71,9 +75,11 @@ def _collect_template_paths(cfg) -> set[str]:
         _visit(processors)
     for p in getattr(cfg, "_rt_procs", None) or []:
         builder = getattr(p, "system_builder", None) or getattr(p, "builder", None) or p
-        tpath = getattr(builder, "template_path", None)
-        if isinstance(tpath, str) and tpath:
-            paths.add(tpath)
+        for attr in dir(builder):
+            if attr.endswith("_path"):
+                tpath = getattr(builder, attr, None)
+                if isinstance(tpath, str) and tpath:
+                    paths.add(tpath)
     return paths
 
 
@@ -95,6 +101,7 @@ def validate_applied_config(
     harnessx template (leaving R_{n+1} functionally unchanged).
     """
     from harnessx.core.harness import HarnessConfig
+
     p = Path(applied_config_path)
     if not p.exists():
         raise ApplyError(f"Evolver did not write {p}")
@@ -110,14 +117,11 @@ def validate_applied_config(
     if expected_bucket == "prompt" and scratch_dir is not None:
         scratch_abs = Path(scratch_dir).resolve()
         tpaths = _collect_template_paths(cfg)
-        inside = [
-            tp for tp in tpaths
-            if _is_inside(Path(tp).resolve(), scratch_abs)
-        ]
+        inside = [tp for tp in tpaths if _is_inside(Path(tp).resolve(), scratch_abs)]
         if not inside:
             raise ApplyError(
                 "prompt-bucket candidate must reference a scratch-dir "
-                f"template_path; found: {sorted(tpaths)!r} (scratch_dir="
+                f"*_path field; found paths: {sorted(tpaths)!r} (scratch_dir="
                 f"{scratch_abs!s})"
             )
     return ApplyResult(applied_path=p, canonicalized=True)
