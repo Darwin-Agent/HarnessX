@@ -243,7 +243,12 @@ def _make_provider(
             thinking_budget_tokens=thinking_budget_tokens,
             max_tokens=max_tokens,
         )
-    return LiteLLMProvider(model, extra_headers={"X-Model-Provider-Id": "YOUR_PROVIDER_ID"})
+    prov_kwargs: dict = {}
+    if api_base:
+        prov_kwargs["api_base"] = api_base
+    if "qwen" in model.lower():
+        prov_kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+    return LiteLLMProvider(model, timeout=120.0, **prov_kwargs)
 
 
 # ---------------------------------------------------------------------------
