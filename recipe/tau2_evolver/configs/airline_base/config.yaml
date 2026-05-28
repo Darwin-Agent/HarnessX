@@ -1,0 +1,18 @@
+# HarnessX Harness Config — tau2-bench (baseline)
+#
+# Direct equivalent of the original make_tau2_harness() Python function.
+# Minimal pipeline: context assembly + token safety only.
+# No loop detection, no parse retry, no tool correction, no tool filtering.
+#
+# Use this as a reference baseline when comparing evaluation scores against
+# harness_config.yaml (hardened) or harness_config_policy.yaml (hardened + hints).
+
+processors:
+
+  # tau2 injects its own system prompt; Null strategy passes it through unchanged.
+  - _target_: harnessx.processors.context.system_prompt.SystemPromptProcessor
+    system_builder:
+      _target_: harnessx.processors.context.strategies.system_prompt.null.NullSystemPromptBuilder
+
+  # Hard context-window truncation (only safety guard in the baseline).
+  - _target_: harnessx.processors.control.token_budget.TokenBudgetProcessor
