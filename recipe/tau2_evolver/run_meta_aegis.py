@@ -348,7 +348,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
             user_api_base=args.user_api_base or None,
             user_temperature=args.user_temperature,
             agent_temperature=args.agent_temperature,
-            judge_model=args.judge_model,
+            judge_model=args.judge_model or args.user_model,
             judge_api_base=args.judge_api_base,
             num_trials=args.num_trials,
             max_steps=args.max_sim_steps,
