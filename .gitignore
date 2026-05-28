@@ -119,3 +119,5 @@ benchmarks/tau2/show_report.py
 
 doc_think/
 uv.lock
+recipe/tau2_evolver/runs*
+meta_rounds/

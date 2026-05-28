@@ -321,13 +321,17 @@ def _run_tau2_round(
         "harness_config": str(round_config_path),
         "logs_dir": str(sessions_dir),
         "extended_thinking": agent_extended_thinking,
+        **(
+            {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
+            if "qwen" in agent_model.lower()
+            else {}
+        ),
         "thinking_budget_tokens": agent_thinking_budget,
         "request_timeout": 120.0,
     }
-    user_llm_args: dict = {
-        "api_base": user_api_base,
-        "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
-    }
+    user_llm_args: dict = {"api_base": user_api_base}
+    if user_api_base and "preset" in (user_api_base or ""):
+        user_llm_args["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
     if user_temperature is not None:
         user_llm_args["temperature"] = user_temperature
     if agent_temperature is not None:

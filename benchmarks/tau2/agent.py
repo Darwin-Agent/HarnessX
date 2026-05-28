@@ -266,6 +266,7 @@ def _build_agent_class() -> type:
             extended_thinking: bool = False,
             thinking_budget_tokens: int = 8000,
             request_timeout: float | None = None,
+            extra_body: dict | None = None,
             **_kwargs: Any,
         ):
             super().__init__(tools=tools, domain_policy=domain_policy)
@@ -310,6 +311,7 @@ def _build_agent_class() -> type:
                 extended_thinking=extended_thinking,
                 thinking_budget_tokens=thinking_budget_tokens,
                 timeout=request_timeout,
+                extra_body=extra_body,
             )
             _model_config = ModelConfig(main=_provider)
             self._harness = Harness(_model_config, self._config)
@@ -475,4 +477,5 @@ def create_harnessx_agent(
         thinking_budget_tokens=llm_args.get("thinking_budget_tokens", 8000),
         request_timeout=llm_args.get("request_timeout"),
         logs_dir=llm_args.get("logs_dir", "runs"),
+        extra_body=llm_args.get("extra_body"),
     )

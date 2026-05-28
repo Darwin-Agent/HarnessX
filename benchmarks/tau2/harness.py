@@ -47,6 +47,7 @@ def make_tau2_provider(
     api_base: str | None = None,
     api_key: str = "EMPTY",
     extra_headers: dict | None = None,
+    extra_body: dict | None = None,
     extended_thinking: bool = False,
     thinking_budget_tokens: int = 8000,
     timeout: float | None = None,
@@ -98,6 +99,10 @@ def make_tau2_provider(
             prov_kwargs["api_base"] = api_base
         if extra_headers:
             prov_kwargs["extra_headers"] = extra_headers
+        if extra_body:
+            prov_kwargs["extra_body"] = extra_body
+        if timeout is not None:
+            prov_kwargs["timeout"] = timeout
         return LiteLLMProvider(model=model, **prov_kwargs)
 
 
