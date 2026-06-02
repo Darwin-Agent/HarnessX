@@ -46,6 +46,7 @@ if _env_path.exists():
 import litellm as _litellm
 
 _litellm.suppress_debug_info = True
+_litellm.drop_params = True
 
 from harnessx.aegis import AegisAgent
 from harnessx.core.harness import HarnessConfig
