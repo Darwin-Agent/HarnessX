@@ -22,7 +22,7 @@ AGENT_API_BASE="http://model.mify.ai.srv/anthropic"
 META_MODEL="anthropic/ppio/pa/claude-opus-4-6"
 META_API_BASE="http://model.mify.ai.srv/anthropic"
 
-OUTPUT_DIR=recipe/tau2_evolver/runs/aegis_telecom_sonnet46
+OUTPUT_DIR=recipe/tau2_evolver/runs/aegis_telecom_sonnet46_v3
 
 echo "[aegis_telecom_sonnet46] Starting AEGIS pilot (${DOMAIN}, ${MAX_TASKS:-all} tasks, ${NUM_ROUNDS} rounds) ..."
 mkdir -p "${OUTPUT_DIR}"

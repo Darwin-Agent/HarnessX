@@ -195,10 +195,12 @@ def _read_latest_commit_shipments(run_dir: Path, round_n: int) -> list[tuple[str
             continue
         if entry.get("round") != round_n:
             continue
-        if entry.get("stage") == "4" and entry.get("kind") == "ship":
-            cid = entry.get("candidate_id", "")
-            bucket = entry.get("bucket", "unknown")
-            shipped.append((cid, bucket))
+        if entry.get("stage") == "4" and entry.get("kind") == "commit":
+            payload = entry.get("payload", {})
+            by_bucket = payload.get("shipped_by_bucket", {})
+            for bucket, cid in by_bucket.items():
+                if cid:
+                    shipped.append((cid, bucket))
     return shipped
 
 
@@ -262,6 +264,7 @@ async def run_pilot(args: argparse.Namespace) -> None:
         model_config=meta_model,
         replay_model=task_model,
         auto_revert_enabled=True,
+        benchmark_context="tau2",
     )
 
     # Output directory
