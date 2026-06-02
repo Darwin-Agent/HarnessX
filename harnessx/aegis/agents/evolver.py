@@ -42,6 +42,7 @@ class EvolverInputs:
     ``ask_more_brief_path``: when supplied (ask-more subcall from the
     Critic), the Evolver runs in ask-more mode with no scratch dir.
     """
+
     round: int
     current_config_path: Path
     landscape_path: Path
@@ -58,11 +59,15 @@ class EvolverInputs:
     # Meta-agent trajectory dir — each Evolver session writes its
     # event stream + messages here for post-hoc inspection.
     sessions_dir: Path | None = None
+    # Benchmark context string passed to the evolver template so it can
+    # tailor guidance (e.g. "tau2" prevents PlainMarkdownSystemPromptBuilder).
+    benchmark_context: str = ""
 
 
 # ---------------------------------------------------------------------------
 # Manifest parser
 # ---------------------------------------------------------------------------
+
 
 def parse_candidate_manifest(md: str) -> tuple[dict, str]:
     """Split a candidate manifest string into (yaml_dict, body_markdown).
@@ -89,6 +94,7 @@ def parse_candidate_manifest(md: str) -> tuple[dict, str]:
 # ---------------------------------------------------------------------------
 # Harness builder
 # ---------------------------------------------------------------------------
+
 
 def build_evolver_harness(inputs: EvolverInputs) -> "HarnessConfig":
     """Return a HarnessConfig for an Evolver agent.
@@ -135,6 +141,7 @@ def build_evolver_harness(inputs: EvolverInputs) -> "HarnessConfig":
         ask_more_brief_path=str(inputs.ask_more_brief_path) if inputs.ask_more_brief_path else "",
         ask_more_candidate_id=inputs.ask_more_candidate_id or "",
         ask_more_candidate_path=str(inputs.ask_more_candidate_path) if inputs.ask_more_candidate_path else "",
+        benchmark_context=inputs.benchmark_context,
     )
     system_builder = StaticSystemPromptBuilder(text=rendered)
 
@@ -145,8 +152,13 @@ def build_evolver_harness(inputs: EvolverInputs) -> "HarnessConfig":
     # Tools are surfaced to the LLM via native function schemas, NOT via any
     # system-prompt announcement — registering here is sufficient.
     for t in (
-        read_tool, write_tool, glob_tool, grep_tool,
-        bash_tool, web_search_tool, web_fetch_tool,
+        read_tool,
+        write_tool,
+        glob_tool,
+        grep_tool,
+        bash_tool,
+        web_search_tool,
+        web_fetch_tool,
     ):
         tool_reg.register(t)
 
@@ -167,6 +179,7 @@ def build_evolver_harness(inputs: EvolverInputs) -> "HarnessConfig":
     )
 
     from harnessx.aegis._paths import api_reference_files, archive_roots
+
     harnessx_src_root = str(_HARNESSX_SRC_ROOT.resolve())
     allowed_read_files = (
         str(inputs.landscape_path.resolve()),
@@ -195,17 +208,13 @@ def build_evolver_harness(inputs: EvolverInputs) -> "HarnessConfig":
     )
 
     # -- Assemble -------------------------------------------------------
-    builder = (
-        HarnessBuilder()
-        .slot(tool_registry=tool_reg)
-    )
+    builder = HarnessBuilder().slot(tool_registry=tool_reg)
     if inputs.sessions_dir is not None:
         builder = builder.slot(
             tracer=HarnessJournal(base_dir=str(inputs.sessions_dir), export_jsonl=True),
         )
     cfg = (
-        builder
-        .add(SystemPromptProcessor(system_builder))
+        builder.add(SystemPromptProcessor(system_builder))
         .add(write_gate)
         .add(read_gate)
         .add(LoopDetectionProcessor())

@@ -283,14 +283,35 @@ candidate ships. Must load via
 changes, `template_path:` must point at your scratch `.md` copy, NOT the
 shared harnessx file.
 
-{% raw %}**Prompts are plain markdown — NOT Jinja templates.** Use
-`PlainMarkdownSystemPromptBuilder`, not `TemplateSystemPromptBuilder`.
-The file you write is handed to the model as-is: any `{{...}}` or
-`{%...%}` in your prose is LITERAL TEXT the model sees. This is
-deliberate — prior rounds crashed when Evolver-shipped prompts contained
-literal Wikipedia syntax (`{{cite tweet}}`) that Jinja parsed as an
-expression. You do not need (and must not use) Jinja syntax in prompt
-candidates.{% endraw %}
+{% raw %}**Prompts are plain markdown — NOT Jinja templates.** Any `{{...}}` or
+`{%...%}` in your prose is LITERAL TEXT the model sees. You do not need
+(and must not use) Jinja syntax in prompt candidates.{% endraw %}
+
+{% if benchmark_context == "tau2" %}
+**CRITICAL — tau2 benchmark constraint.** The benchmark injects its own
+domain policy (≈23K chars) as `state.messages[0]` (system message).
+`NullSystemPromptBuilder` in the config means "let the benchmark handle
+its own system prompt" — it does NOT mean "there is no system prompt."
+
+You MUST NOT replace `NullSystemPromptBuilder` with
+`PlainMarkdownSystemPromptBuilder`. The harness runloop DELETES all
+existing system messages when a non-null system prompt is set by a
+processor, destroying the domain policy. This causes catastrophic
+regression across ALL task categories (proven: prior experiments dropped
+55% when this happened).
+
+For prompt-bucket changes, use `AppendSystemPromptProcessor` via
+`file://` URI. It appends your supplement AFTER the existing domain
+policy — the model sees both the full policy AND your additional rules.
+
+Your `supplement.md` should contain ONLY narrow, targeted rules for
+specific failure modes — NOT a restatement of the domain policy.
+Good example: "After MMS troubleshooting steps complete without success,
+check `get_data_usage` to determine if the data cap has been exceeded."
+Bad example: rewriting the entire troubleshooting flow or adding broad
+"Server-side checks FIRST" guidance that conflicts with the policy's
+prescribed order.
+{% endif %}
 
 Final_output text alone ships nothing.
 
@@ -306,6 +327,62 @@ hallucination.
 
 YAML shapes that canonicalize cleanly:
 
+{% if benchmark_context == "tau2" %}
+```yaml
+# bucket = prompt (tau2 — append only, NEVER replace NullSystemPromptBuilder)
+processors:
+  - _target_: file://<scratch>/append_system_prompt.py::AppendSystemPromptProcessor
+    supplement_path: <scratch>/supplement.md
+
+# bucket = config — modify kwargs on an existing processor entry
+processors:
+  - _target_: harnessx.processors.control.token_budget.TokenBudgetProcessor
+    max_tokens: 120000
+
+# bucket = processor — new processor class
+processors:
+  - _target_: file://<scratch>/<name>.py::YourProcessor
+    some_kwarg: 30
+    _hook_: '*'
+```
+
+The `AppendSystemPromptProcessor` implementation pattern (write this to
+your scratch dir):
+
+```python
+from __future__ import annotations
+import pathlib
+from typing import AsyncIterator
+from harnessx.core.events import TaskStartEvent, Message
+from harnessx.core.processor import MultiHookProcessor
+
+class AppendSystemPromptProcessor(MultiHookProcessor):
+    _singleton_group = "context.append_system"
+    _order = 2
+
+    def __init__(self, supplement_path: str = "") -> None:
+        self._supplement_path = supplement_path
+        self._supplement: str | None = None
+
+    def _load(self) -> str:
+        if self._supplement is None:
+            p = pathlib.Path(self._supplement_path)
+            self._supplement = p.read_text(encoding="utf-8") if p.exists() else ""
+        return self._supplement
+
+    async def on_task_start(self, event: TaskStartEvent) -> AsyncIterator[TaskStartEvent]:
+        text = self._load()
+        if text and event.state is not None:
+            msgs = event.state.messages
+            if msgs and msgs[0].role == "system":
+                orig = msgs[0]
+                msgs[0] = Message(role="system", content=orig.content + "\n\n" + text,
+                    tool_call_id=orig.tool_call_id, name=orig.name,
+                    tool_calls=orig.tool_calls, thinking=orig.thinking,
+                    thinking_blocks=orig.thinking_blocks, msg_id=orig.msg_id)
+        yield event
+```
+{% else %}
 ```yaml
 # bucket = prompt
 processors:
@@ -331,6 +408,7 @@ processors:
     some_kwarg: 30
     _hook_: '*'
 ```
+{% endif %}
 
 ## Reference implementations (Read, don't guess)
 

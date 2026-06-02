@@ -10,6 +10,7 @@ Public API:
 - :class:`AegisAgent` — drop-in replacement for ``MetaAgent``
 - :func:`compute_changeset` — re-export from meta_harness for recipe compat
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -47,6 +48,7 @@ class AegisAgent:
     # the pilot driver, not inside ``run_round``, so this is currently unused
     # but wired for forward-compat.
     auto_revert_enabled: bool = True
+    benchmark_context: str = ""
 
     async def evolve(
         self,
@@ -78,10 +80,7 @@ class AegisAgent:
             elif isinstance(flags, (list, tuple)):
                 coerced[tid] = [bool(x) for x in flags]
             else:
-                raise TypeError(
-                    f"pass_flags_by_task[{tid!r}] must be bool or list[bool]; "
-                    f"got {type(flags).__name__}"
-                )
+                raise TypeError(f"pass_flags_by_task[{tid!r}] must be bool or list[bool]; got {type(flags).__name__}")
         pass_flags_by_task = coerced
 
         trajectories_dir = Path(trajectories_dir)
@@ -112,6 +111,7 @@ class AegisAgent:
             budget_per_round_usd=self.budget_per_round_usd,
             replay_model=self.replay_model,
             auto_revert_enabled=self.auto_revert_enabled,
+            benchmark_context=self.benchmark_context,
         )
 
         run_round_result = await orch.run_round(

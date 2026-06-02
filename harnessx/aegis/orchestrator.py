@@ -125,6 +125,8 @@ class AegisOrchestrator:
     # 0.8 is PARTIAL_PASS; 1.0 is ALL_FAIL. Default 0.3 treats pure all-pass
     # runs as no-op without burning Planner/Evolver/Critic meta budget.
     min_actionability: float = 0.3
+    # Benchmark context string forwarded to the evolver template.
+    benchmark_context: str = ""
     # TODO(stage5): ``adjudicate_previous_round`` is not called from ``run_round``.
     # Stage 5 runs ACROSS rounds in the pilot driver (not inside this class).
     # When the pilot loop is implemented, it should call
@@ -417,6 +419,7 @@ class AegisOrchestrator:
             model_config=self.model_config,
             max_cost_usd=100.0,
             sessions_dir=round_dir / "meta_sessions" / "evolver",
+            benchmark_context=self.benchmark_context,
         )
         for cid, ok, reason in stage_2["results"]:
             self.audit.append(
@@ -452,6 +455,7 @@ class AegisOrchestrator:
                     ask_more_brief_path=brief_path,
                     ask_more_candidate_id=cid,
                     ask_more_candidate_path=scratch,
+                    benchmark_context=self.benchmark_context,
                 )
             )
 

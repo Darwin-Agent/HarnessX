@@ -7,6 +7,7 @@ decides how many candidates (K ≥ 0) to write based on evidence. The
 orchestrator enumerates whatever actually got written under
 ``candidates_dir`` and ``applied_root``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,9 @@ from pathlib import Path
 
 from harnessx import BaseTask
 from harnessx.aegis.agents.evolver import (
-    EvolverInputs, build_evolver_harness, parse_candidate_manifest,
+    EvolverInputs,
+    build_evolver_harness,
+    parse_candidate_manifest,
 )
 from harnessx.aegis.apply import ApplyError, validate_applied_config
 
@@ -32,6 +35,7 @@ async def run_stage_2(
     model_config,
     max_cost_usd: float = 100.0,
     sessions_dir: Path | None = None,
+    benchmark_context: str = "",
 ) -> dict:
     candidates_dir.mkdir(parents=True, exist_ok=True)
     applied_root = candidates_dir.parent / "applied"
@@ -46,19 +50,23 @@ async def run_stage_2(
         candidates_dir=candidates_dir,
         applied_root=applied_root,
         sessions_dir=sessions_dir,
+        benchmark_context=benchmark_context,
     )
     cfg = build_evolver_harness(inputs)
     harness = model_config.agentic(cfg)
     try:
-        result = await harness.run(BaseTask(
-            description=(
-                f"Round {round_n} Evolver. Produce K candidate manifests + "
-                f"K applied scratch dirs under {candidates_dir} / {applied_root}. "
-                f"K is your choice based on evidence (K ≥ 0). Final_output alone "
-                f"is discarded — only files written via write_tool survive."
-            ),
-            max_steps=200, max_cost_usd=max_cost_usd,
-        ))
+        result = await harness.run(
+            BaseTask(
+                description=(
+                    f"Round {round_n} Evolver. Produce K candidate manifests + "
+                    f"K applied scratch dirs under {candidates_dir} / {applied_root}. "
+                    f"K is your choice based on evidence (K ≥ 0). Final_output alone "
+                    f"is discarded — only files written via write_tool survive."
+                ),
+                max_steps=200,
+                max_cost_usd=max_cost_usd,
+            )
+        )
         _log.info(
             "Evolver R%d: exit=%s steps=%s cost=$%.3f tokens=%d candidates=%d",
             round_n,
@@ -92,9 +100,7 @@ async def run_stage_2(
             continue
         expected_bucket: str | None = None
         try:
-            fm, _body = parse_candidate_manifest(
-                candidate_path.read_text(encoding="utf-8")
-            )
+            fm, _body = parse_candidate_manifest(candidate_path.read_text(encoding="utf-8"))
             if isinstance(fm, dict):
                 expected_bucket = fm.get("bucket")
         except Exception as exc:
