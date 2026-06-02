@@ -315,8 +315,7 @@ def _run_tau2_round(
         _nl_eval.DEFAULT_LLM_NL_ASSERTIONS = judge_model
         _nl_eval.DEFAULT_LLM_NL_ASSERTIONS_ARGS = {
             "temperature": 0.0,
-            "api_base": judge_api_base or agent_api_base,
-            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
+            "api_base": judge_api_base or user_api_base or agent_api_base,
         }
 
     agent_llm_args: dict = {
