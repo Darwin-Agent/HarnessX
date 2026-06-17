@@ -1,5 +1,9 @@
 """HarnessX — composable, trainable Agent Harness."""
 
+# Apply defensive patch to anyio's asyncio CancelScope as early as possible.
+# See harnessx/_anyio_patch.py for the why. Import for side effects only.
+from . import _anyio_patch as _anyio_patch  # noqa: F401
+
 from .core.events import (
     BeforeModelEvent,
     StepStartEvent,
