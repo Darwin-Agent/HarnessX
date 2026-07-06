@@ -34,12 +34,14 @@ class AnthropicProvider(AgenticMixin, BaseModelProvider):
         timeout: float | None = None,
         request_timeout: float | None = None,  # alias for timeout (LiteLLM compat)
         default_headers: dict | None = None,
+        cache_system_prompt: bool = False,
         **kwargs,
     ):
         # Strip LiteLLM routing prefix "anthropic/" if present — the Anthropic
         # SDK only wants the bare model name (e.g. "claude-sonnet-4-6").
         self.model = model.removeprefix("anthropic/")
         self.max_tokens = max_tokens
+        self.cache_system_prompt = cache_system_prompt
         self.extended_thinking = extended_thinking
         self.thinking_budget_tokens = thinking_budget_tokens
         self._api_key = api_key
@@ -129,7 +131,18 @@ class AnthropicProvider(AgenticMixin, BaseModelProvider):
 
         kwargs = dict(self.kwargs)
         if system_text:
-            kwargs["system"] = system_text.strip()
+            if self.cache_system_prompt:
+                # Prompt caching: checkpoint covers the prefix (tools + system),
+                # so byte-stable tools + system cache across calls and sessions.
+                kwargs["system"] = [
+                    {
+                        "type": "text",
+                        "text": system_text.strip(),
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
+            else:
+                kwargs["system"] = system_text.strip()
 
         # Extended thinking: adds a reasoning step before the response.
         # Requires temperature=1 (Anthropic API constraint).
@@ -257,6 +270,8 @@ class AnthropicProvider(AgenticMixin, BaseModelProvider):
         usage = Usage(
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
+            cache_read_tokens=getattr(response.usage, "cache_read_input_tokens", 0) or 0,
+            cache_write_tokens=getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
         )
 
         return ModelResponseEvent(
