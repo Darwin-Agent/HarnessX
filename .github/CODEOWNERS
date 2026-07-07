@@ -1,9 +1,9 @@
 # Default owners — all PRs require review from at least one owner
-* @tenghl @TiyCHEN
+* @tenghl @TiyCHEN @zhao9797
 
 # Core framework
-harnessx/ @tenghl @TiyCHEN
+harnessx/ @tenghl @TiyCHEN @zhao9797
 
 # CI/CD config changes require extra review
-.github/ @tenghl @TiyCHEN
-.pre-commit-config.yaml @tenghl @TiyCHEN
+.github/ @tenghl @TiyCHEN @zhao9797
+.pre-commit-config.yaml @tenghl @TiyCHEN @zhao9797
