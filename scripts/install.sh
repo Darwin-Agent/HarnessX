@@ -67,7 +67,7 @@ ask() {
         return
     fi
     local choices="[Y/n]"
-    [[ "${default,,}" == "n" ]] && choices="[y/N]"
+    [[ "$default" == [nN] ]] && choices="[y/N]"
     local answer
     read -r -p "$prompt $choices " answer </dev/tty
     echo "${answer:-$default}"
@@ -226,7 +226,7 @@ handle_node() {
 
     local ans
     ans=$(ask "Install Node.js now?")
-    if [[ "${ans,,}" =~ ^y ]]; then
+    if [[ "$ans" =~ ^[yY] ]]; then
         if install_node && check_node; then
             success "Node.js v$(_node_version) installed"
             NODE_OK=true
@@ -280,7 +280,7 @@ install_gateway() {
 
     local ans
     ans=$(ask "Install IM Gateway?")
-    if [[ ! "${ans,,}" =~ ^y ]]; then
+    if [[ ! "$ans" =~ ^[yY] ]]; then
         info "Skipping Gateway install"
         return
     fi
