@@ -65,7 +65,7 @@ hx = "harnessx.cli:main"
 harnessx = "harnessx.cli:main"
 
 [project.urls]
-Homepage = "https://darwin-agent.github.io/HarnessX/"
+Homepage = "https://raw.githack.com/Darwin-Agent/HarnessX/gh-pages/index.html"
 Repository = "https://github.com/Darwin-Agent/HarnessX"
 Issues = "https://github.com/Darwin-Agent/HarnessX/issues"
 Changelog = "https://github.com/Darwin-Agent/HarnessX/blob/main/CHANGELOG.md"
