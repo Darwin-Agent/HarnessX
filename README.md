@@ -20,9 +20,11 @@
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11+-3b82f6?style=flat&logo=python&logoColor=white"/>
   <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-a855f7?style=flat"/>
   <img alt="Status" src="https://img.shields.io/badge/Status-Beta-f59e0b?style=flat"/>
+  <a href="https://darwin-agent.github.io/HarnessX/"><img alt="Homepage" src="https://img.shields.io/badge/Homepage-HarnessX-ed722e?style=flat"/></a>
 </p>
 
 <p align="center">
+  <a href="https://darwin-agent.github.io/HarnessX/">Homepage</a> •
   <a href="#overview">Overview</a> •
   <a href="#architecture">Architecture</a> •
   <a href="#quick-start">Quick Start</a> •
