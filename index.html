@@ -3,39 +3,43 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HarnessX: A Composable, Adaptive, and Evolvable Agent Harness Foundry</title>
+    <meta name="theme-color" content="#111820" />
+    <title>HarnessX | Compose, adapt, and evolve agent behavior</title>
     <meta
       name="description"
-      content="HarnessX is a composable, adaptive, and evolvable agent harness foundry for improving AI agents through typed runtime composition, trace-driven harness evolution, and model-harness co-evolution."
+      content="HarnessX is a composable, adaptive, and evolvable agent harness foundry. Compose behavior, evolve harnesses from traces, and train models on better trajectories."
     />
-    <meta property="og:title" content="HarnessX" />
+    <meta property="og:title" content="HarnessX | Agent Harness Foundry" />
     <meta
       property="og:description"
-      content="A composable, adaptive, and evolvable agent harness foundry."
+      content="Compose, adapt, and evolve the runtime harness around your agent."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://darwin-agent.github.io/HarnessX/" />
-    <meta property="og:image" content="https://raw.githubusercontent.com/Darwin-Agent/HarnessX/main/docs/assets/harnessx_architecture.png" />
-    <link rel="icon" href="https://raw.githubusercontent.com/Darwin-Agent/HarnessX/main/docs/assets/harnessx_logo.png" />
+    <meta
+      property="og:image"
+      content="https://darwin-agent.github.io/HarnessX/assets/paper/harnessx_architecture.png"
+    />
+    <link rel="icon" href="assets/logo.svg" />
     <style>
       :root {
         color-scheme: light;
-        --ink: #141821;
-        --muted: #596272;
-        --soft: #eef2f6;
-        --paper: #f7f8fb;
-        --line: #d9e0ea;
+        --ink: #111820;
+        --muted: #5c6875;
+        --paper: #f4f6f8;
         --white: #ffffff;
-        --orange: #ed722e;
-        --orange-dark: #b54c17;
-        --blue: #0f4c75;
+        --line: #d8e0e7;
+        --orange: #ed6b2d;
+        --orange-dark: #bb4b19;
         --teal: #167c80;
-        --green: #2f855a;
-        --violet: #6554c0;
-        --shadow: 0 20px 60px rgba(21, 25, 33, 0.14);
+        --blue: #255b78;
+        --night: #121b24;
+        --shadow: 0 18px 50px rgba(17, 24, 32, 0.12);
       }
 
-      * {
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
       }
 
@@ -45,6 +49,7 @@
 
       body {
         margin: 0;
+        overflow-x: hidden;
         background: var(--paper);
         color: var(--ink);
         font-family:
@@ -63,22 +68,23 @@
         max-width: 100%;
       }
 
+      .container {
+        width: min(1120px, calc(100% - 48px));
+        margin: 0 auto;
+      }
+
       .site-header {
         position: fixed;
-        z-index: 20;
-        top: 0;
-        left: 0;
-        right: 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(16, 18, 24, 0.74);
-        backdrop-filter: blur(16px);
+        z-index: 10;
+        inset: 0 0 auto;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(17, 24, 32, 0.88);
+        backdrop-filter: blur(14px);
         color: var(--white);
       }
 
       .nav {
-        width: min(1180px, calc(100% - 40px));
-        min-height: 64px;
-        margin: 0 auto;
+        min-height: 70px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -89,16 +95,23 @@
         display: inline-flex;
         align-items: center;
         gap: 10px;
-        font-weight: 800;
         font-size: 18px;
+        font-weight: 850;
       }
 
-      .brand img {
-        width: 34px;
-        height: 34px;
+      .brand-mark {
+        display: inline-grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.46);
+        border-radius: 7px;
+        color: var(--orange);
+        font-size: 15px;
+        font-weight: 900;
       }
 
-      .brand span span,
+      .brand-x,
       .mark {
         color: var(--orange);
       }
@@ -106,63 +119,83 @@
       .nav-links {
         display: flex;
         align-items: center;
-        gap: 18px;
-        font-size: 14px;
-        color: rgba(255, 255, 255, 0.82);
+        gap: 22px;
+        color: rgba(255, 255, 255, 0.76);
+        font-size: 13px;
       }
 
-      .nav-links a:hover {
+      .nav-links a {
+        transition: color 160ms ease;
+      }
+
+      .nav-links a:hover,
+      .nav-links a:focus-visible {
         color: var(--white);
+      }
+
+      .nav-github {
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        border-radius: 6px;
+        padding: 8px 12px;
+        color: var(--white) !important;
+        font-weight: 750;
       }
 
       .hero {
         position: relative;
-        min-height: 82vh;
-        padding: 128px 0 80px;
+        min-height: 760px;
+        display: flex;
+        align-items: center;
         overflow: hidden;
-        background:
-          linear-gradient(90deg, rgba(10, 12, 16, 0.96) 0%, rgba(10, 12, 16, 0.84) 39%, rgba(10, 12, 16, 0.5) 72%, rgba(10, 12, 16, 0.25) 100%),
-          url("assets/paper/fig1.png") center / cover no-repeat;
+        padding: 132px 0 94px;
+        background-color: #121a23;
+        background-image:
+          linear-gradient(180deg, rgba(12, 18, 25, 0.12) 0%, rgba(12, 18, 25, 0.28) 52%, rgba(12, 18, 25, 0.92) 88%, rgba(12, 18, 25, 0.98) 100%),
+          linear-gradient(90deg, rgba(12, 18, 25, 0.97) 0%, rgba(12, 18, 25, 0.9) 42%, rgba(12, 18, 25, 0.42) 78%, rgba(12, 18, 25, 0.2) 100%),
+          url("assets/paper/fig1.png");
+        background-position: center, 68% center;
+        background-repeat: no-repeat;
+        background-size: cover;
         color: var(--white);
       }
 
       .hero::after {
-        content: "";
         position: absolute;
-        inset: auto 0 0;
-        height: 180px;
-        background: linear-gradient(180deg, rgba(247, 248, 251, 0), var(--paper));
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 54px;
+        background: linear-gradient(180deg, transparent, var(--paper));
+        content: "";
+        pointer-events: none;
       }
 
-      .hero-inner,
-      .section-inner {
-        width: min(1180px, calc(100% - 40px));
-        margin: 0 auto;
-      }
-
-      .hero-inner {
+      .hero-content {
         position: relative;
-        z-index: 2;
-        display: grid;
-        gap: 28px;
+        z-index: 1;
+        max-width: 680px;
+      }
+
+      .eyebrow,
+      .section-label {
+        color: #f9b391;
+        font-size: 12px;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
 
       .eyebrow {
         display: inline-flex;
-        width: fit-content;
         align-items: center;
         gap: 10px;
-        color: #ffd1ba;
-        font-size: 13px;
-        font-weight: 800;
-        text-transform: uppercase;
       }
 
       .eyebrow::before {
-        content: "";
         width: 34px;
         height: 2px;
         background: var(--orange);
+        content: "";
       }
 
       h1,
@@ -173,24 +206,27 @@
       }
 
       h1 {
-        max-width: 860px;
-        font-size: 72px;
-        line-height: 0.95;
+        max-width: 640px;
+        margin-top: 24px;
+        font-size: 82px;
         font-weight: 900;
+        line-height: 0.96;
       }
 
-      .subtitle {
-        max-width: 860px;
-        color: rgba(255, 255, 255, 0.9);
+      .hero-title {
+        max-width: 600px;
+        margin-top: 22px;
+        color: rgba(255, 255, 255, 0.92);
         font-size: 28px;
+        font-weight: 720;
         line-height: 1.25;
-        font-weight: 700;
       }
 
       .hero-copy {
-        max-width: 760px;
-        color: rgba(255, 255, 255, 0.76);
-        font-size: 18px;
+        max-width: 620px;
+        margin-top: 20px;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 17px;
         line-height: 1.7;
       }
 
@@ -198,20 +234,30 @@
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
+        margin-top: 30px;
       }
 
       .button {
         display: inline-flex;
-        min-height: 46px;
+        min-height: 44px;
         align-items: center;
         justify-content: center;
-        gap: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        border-radius: 8px;
-        padding: 0 18px;
+        border: 1px solid rgba(255, 255, 255, 0.32);
+        border-radius: 7px;
+        padding: 0 17px;
         color: var(--white);
-        font-weight: 800;
-        background: rgba(255, 255, 255, 0.1);
+        font-size: 14px;
+        font-weight: 780;
+        transition:
+          transform 160ms ease,
+          background 160ms ease,
+          border-color 160ms ease;
+      }
+
+      .button:hover,
+      .button:focus-visible {
+        transform: translateY(-1px);
+        border-color: rgba(255, 255, 255, 0.7);
       }
 
       .button.primary {
@@ -219,213 +265,256 @@
         background: var(--orange);
       }
 
-      .button:hover {
-        transform: translateY(-1px);
+      .button.secondary {
+        background: rgba(255, 255, 255, 0.08);
       }
 
-      .hero-metrics {
+      .hero-stats {
         display: grid;
-        grid-template-columns: repeat(4, minmax(120px, 1fr));
-        gap: 12px;
-        max-width: 860px;
-        margin-top: 8px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        max-width: 700px;
+        margin-top: 58px;
+        padding: 0 16px 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.28);
+        background: rgba(8, 14, 20, 0.64);
       }
 
-      .metric {
-        min-height: 92px;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        border-radius: 8px;
-        padding: 16px;
-        background: rgba(15, 18, 25, 0.62);
+      .hero-stat {
+        min-height: 86px;
+        padding: 18px 22px 0 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.22);
       }
 
-      .metric strong {
+      .hero-stat + .hero-stat {
+        padding-left: 22px;
+      }
+
+      .hero-stat:last-child {
+        border-right: 0;
+      }
+
+      .hero-stat strong {
         display: block;
-        color: var(--white);
         font-size: 28px;
         line-height: 1;
       }
 
-      .metric span {
+      .hero-stat span {
         display: block;
-        margin-top: 8px;
-        color: rgba(255, 255, 255, 0.72);
-        font-size: 13px;
+        max-width: 160px;
+        margin-top: 9px;
+        color: rgba(255, 255, 255, 0.65);
+        font-size: 12px;
         line-height: 1.35;
       }
 
       section {
-        padding: 82px 0;
+        padding: 96px 0;
       }
 
-      .section-kicker {
+      .section-label {
         color: var(--orange-dark);
-        font-size: 13px;
-        font-weight: 900;
-        text-transform: uppercase;
       }
 
-      .section-head {
-        display: grid;
-        grid-template-columns: minmax(0, 0.9fr) minmax(260px, 0.62fr);
-        gap: 34px;
-        align-items: end;
-        margin-bottom: 32px;
-      }
-
-      h2 {
-        margin-top: 8px;
-        font-size: 40px;
+      .section-heading {
+        max-width: 700px;
+        margin-top: 10px;
+        font-size: 42px;
         line-height: 1.08;
+      }
+
+      .section-intro {
+        display: grid;
+        grid-template-columns: minmax(0, 0.92fr) minmax(280px, 0.7fr);
+        gap: 64px;
+        align-items: end;
       }
 
       .lead {
         color: var(--muted);
-        font-size: 17px;
-        line-height: 1.65;
+        font-size: 16px;
+        line-height: 1.7;
       }
 
-      .grid-3 {
+      .pillars {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 18px;
+        gap: 28px;
+        margin-top: 58px;
       }
 
-      .card {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 22px;
-        background: var(--white);
-        box-shadow: 0 10px 30px rgba(20, 24, 33, 0.05);
+      .pillar {
+        min-height: 164px;
+        padding: 20px 20px 0 0;
+        border-top: 2px solid var(--orange);
       }
 
-      .card h3 {
-        font-size: 20px;
-        line-height: 1.2;
+      .pillar:nth-child(2) {
+        border-top-color: var(--teal);
       }
 
-      .card p {
+      .pillar:nth-child(3) {
+        border-top-color: var(--blue);
+      }
+
+      .pillar-number {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .pillar h3 {
+        margin-top: 18px;
+        font-size: 22px;
+      }
+
+      .pillar p {
         margin-top: 10px;
         color: var(--muted);
         font-size: 15px;
         line-height: 1.6;
       }
 
-      .accent-orange {
-        border-top: 4px solid var(--orange);
-      }
-
-      .accent-teal {
-        border-top: 4px solid var(--teal);
-      }
-
-      .accent-green {
-        border-top: 4px solid var(--green);
-      }
-
-      .figure-band {
+      .visual-section {
+        padding-top: 0;
         background: var(--white);
       }
 
-      .figure-frame {
+      .visual-frame {
+        overflow: hidden;
         border: 1px solid var(--line);
         border-radius: 8px;
-        padding: 14px;
-        background: #fbfcfe;
+        padding: 12px;
+        background: #fbfcfd;
         box-shadow: var(--shadow);
       }
 
-      .figure-frame img {
+      .visual-frame img {
         width: 100%;
-        border-radius: 6px;
+        height: auto;
+        border-radius: 4px;
       }
 
       .caption {
-        margin-top: 12px;
+        max-width: 780px;
+        margin-top: 14px;
         color: var(--muted);
-        font-size: 14px;
-        line-height: 1.5;
+        font-size: 13px;
+        line-height: 1.55;
       }
 
       .method {
-        background:
-          linear-gradient(180deg, var(--paper), #eef5f5);
+        background: #eaf1f2;
       }
 
-      .timeline {
+      .method-steps {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 18px;
-        counter-reset: step;
+        gap: 28px;
+        margin-top: 52px;
       }
 
-      .step {
-        position: relative;
-        min-height: 250px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 24px;
-        background: var(--white);
+      .method-step {
+        min-height: 206px;
+        padding: 22px 24px 0 0;
+        border-top: 2px solid var(--blue);
       }
 
-      .step::before {
-        counter-increment: step;
-        content: "0" counter(step);
-        display: inline-flex;
-        width: 42px;
-        height: 42px;
-        align-items: center;
-        justify-content: center;
+      .method-step:nth-child(2) {
+        border-top-color: var(--teal);
+      }
+
+      .method-step:nth-child(3) {
+        border-top-color: var(--orange);
+      }
+
+      .step-index {
+        display: inline-grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
         border-radius: 50%;
         color: var(--white);
         background: var(--blue);
-        font-weight: 900;
+        font-size: 13px;
+        font-weight: 850;
       }
 
-      .step:nth-child(2)::before {
+      .method-step:nth-child(2) .step-index {
         background: var(--teal);
       }
 
-      .step:nth-child(3)::before {
+      .method-step:nth-child(3) .step-index {
         background: var(--orange);
       }
 
-      .step h3 {
+      .method-step h3 {
         margin-top: 18px;
-        font-size: 22px;
+        font-size: 21px;
       }
 
-      .step p {
-        margin-top: 12px;
+      .method-step p {
+        margin-top: 10px;
         color: var(--muted);
         font-size: 15px;
-        line-height: 1.65;
+        line-height: 1.6;
+      }
+
+      .method-figure {
+        margin-top: 42px;
       }
 
       .results {
-        background: #151923;
+        background: var(--night);
         color: var(--white);
       }
 
-      .results .section-kicker {
-        color: #ffb288;
+      .results .section-label {
+        color: #f9b391;
       }
 
       .results .lead {
-        color: rgba(255, 255, 255, 0.72);
+        color: rgba(255, 255, 255, 0.68);
+      }
+
+      .result-highlights {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 48px;
+      }
+
+      .result-highlight {
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.36);
+      }
+
+      .result-highlight strong {
+        display: block;
+        color: #ffd0b9;
+        font-size: 30px;
+        line-height: 1;
+      }
+
+      .result-highlight span {
+        display: block;
+        margin-top: 9px;
+        color: rgba(255, 255, 255, 0.64);
+        font-size: 13px;
+        line-height: 1.4;
       }
 
       .table-wrap {
         overflow-x: auto;
-        border: 1px solid rgba(255, 255, 255, 0.14);
+        margin-top: 50px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
         border-radius: 8px;
-        background: rgba(255, 255, 255, 0.04);
       }
 
       table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 780px;
+        min-width: 640px;
         font-size: 14px;
       }
 
@@ -438,8 +527,10 @@
       }
 
       th {
-        color: rgba(255, 255, 255, 0.66);
-        font-size: 12px;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.07em;
         text-transform: uppercase;
       }
 
@@ -448,573 +539,656 @@
       }
 
       .gain {
-        color: #86efac;
-        font-weight: 900;
+        color: #8ee3a8;
+        font-weight: 850;
       }
 
-      .peak {
-        color: #ffd1ba;
-        font-weight: 900;
+      .results-details {
+        margin-top: 18px;
+        color: rgba(255, 255, 255, 0.74);
+        font-size: 14px;
+      }
+
+      .results-details summary {
+        display: inline-block;
+        cursor: pointer;
+        color: #ffd0b9;
+        font-weight: 750;
+      }
+
+      .results-details .table-wrap {
+        margin-top: 16px;
       }
 
       .result-figure {
-        margin-top: 24px;
+        margin-top: 42px;
       }
 
-      .split {
+      .co-evolution {
+        background: var(--white);
+      }
+
+      .co-grid {
         display: grid;
-        grid-template-columns: minmax(0, 0.62fr) minmax(300px, 0.38fr);
-        gap: 28px;
+        grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.72fr);
+        gap: 56px;
         align-items: center;
       }
 
-      .quote-panel {
-        border-left: 4px solid var(--orange);
-        padding: 12px 0 12px 20px;
+      .co-copy .section-heading {
+        max-width: 520px;
       }
 
-      .quote-panel p {
+      .co-copy p:last-child {
+        max-width: 500px;
+        margin-top: 20px;
+        padding-left: 18px;
+        border-left: 3px solid var(--orange);
         color: var(--muted);
         font-size: 17px;
         line-height: 1.7;
       }
 
-      .failure-grid {
+      .paper {
+        background: var(--paper);
+      }
+
+      .paper-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
+        grid-template-columns: minmax(0, 0.75fr) minmax(320px, 1fr);
+        gap: 52px;
+        align-items: start;
       }
 
-      .failure-grid figure {
-        margin: 0;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        overflow: hidden;
-        background: var(--white);
+      .paper-copy .section-heading {
+        max-width: 440px;
       }
 
-      .failure-grid img {
-        width: 100%;
-        aspect-ratio: 1 / 1.05;
-        object-fit: cover;
-        object-position: top;
-      }
-
-      .failure-grid figcaption {
-        padding: 12px;
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.45;
-      }
-
-      .citation {
-        background: var(--white);
+      .paper-copy .lead {
+        max-width: 460px;
+        margin-top: 18px;
       }
 
       pre {
         overflow-x: auto;
         margin: 0;
-        border: 1px solid var(--line);
+        border: 1px solid #273545;
         border-radius: 8px;
-        padding: 18px;
-        background: #10141b;
-        color: #e7edf6;
+        padding: 20px;
+        background: #101820;
+        color: #dce7f0;
         font-size: 13px;
-        line-height: 1.55;
+        line-height: 1.6;
+      }
+
+      .paper-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 26px;
+      }
+
+      .paper .button {
+        border-color: var(--line);
+        color: var(--ink);
+        background: var(--white);
+      }
+
+      .paper .button.primary {
+        border-color: var(--orange);
+        color: var(--white);
+        background: var(--orange);
       }
 
       .footer {
-        padding: 34px 0;
+        padding: 30px 0;
         border-top: 1px solid var(--line);
         color: var(--muted);
         background: var(--paper);
-        font-size: 14px;
+        font-size: 13px;
       }
 
       .footer-inner {
-        width: min(1180px, calc(100% - 40px));
-        margin: 0 auto;
         display: flex;
         justify-content: space-between;
         gap: 20px;
       }
 
+      :focus-visible {
+        outline: 3px solid #f6a77f;
+        outline-offset: 3px;
+      }
+
       @media (max-width: 900px) {
-        .nav {
-          width: min(100% - 28px, 1180px);
+        .container {
+          width: min(100% - 32px, 1120px);
         }
 
-        .nav-links {
+        .nav-links a:not(.nav-github) {
           display: none;
         }
 
         .hero {
-          min-height: 78vh;
-          padding: 108px 0 64px;
-          background:
-            linear-gradient(180deg, rgba(10, 12, 16, 0.96) 0%, rgba(10, 12, 16, 0.82) 62%, rgba(10, 12, 16, 0.38) 100%),
-            url("assets/paper/fig1.png") center / cover no-repeat;
-        }
-
-        .hero-inner,
-        .section-inner,
-        .footer-inner {
-          width: min(100% - 28px, 1180px);
+          min-height: 650px;
+          padding: 116px 0 70px;
+          background-image:
+            linear-gradient(180deg, rgba(12, 18, 25, 0.18) 0%, rgba(12, 18, 25, 0.3) 48%, rgba(12, 18, 25, 0.94) 86%, rgba(12, 18, 25, 0.98) 100%),
+            linear-gradient(180deg, rgba(12, 18, 25, 0.96) 0%, rgba(12, 18, 25, 0.88) 56%, rgba(12, 18, 25, 0.48) 100%),
+            url("assets/paper/fig1.png");
+          background-position: center, 62% center;
         }
 
         h1 {
-          font-size: 46px;
+          font-size: 54px;
         }
 
-        .subtitle {
-          font-size: 22px;
+        .hero-title {
+          max-width: 560px;
+          font-size: 23px;
         }
 
         .hero-copy {
           font-size: 16px;
         }
 
-        .hero-metrics,
-        .grid-3,
-        .timeline,
-        .split,
-        .section-head {
+        .hero-stats {
+          margin-top: 42px;
+        }
+
+        section {
+          padding: 72px 0;
+        }
+
+        .section-intro,
+        .co-grid,
+        .paper-grid {
           grid-template-columns: 1fr;
+          gap: 28px;
+        }
+
+        .section-heading {
+          font-size: 34px;
+        }
+
+        .pillars,
+        .method-steps {
+          grid-template-columns: 1fr;
+          gap: 24px;
+          margin-top: 38px;
+        }
+
+        .pillar,
+        .method-step {
+          min-height: 0;
+          padding-right: 0;
+        }
+
+        .result-highlights {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          row-gap: 28px;
+        }
+
+        .paper-grid {
+          gap: 34px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .container {
+          width: min(100% - 28px, 1120px);
+        }
+
+        .nav {
+          min-height: 62px;
+        }
+
+        .brand {
+          font-size: 17px;
+        }
+
+        .nav-github {
+          padding: 7px 10px;
+        }
+
+        .hero {
+          min-height: 650px;
+          padding-top: 102px;
+        }
+
+        h1 {
+          margin-top: 20px;
+          font-size: 48px;
+        }
+
+        .hero-title {
+          margin-top: 18px;
+          font-size: 21px;
+        }
+
+        .hero-copy {
+          margin-top: 16px;
+          font-size: 15px;
+          line-height: 1.58;
+        }
+
+        .actions {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+          margin-top: 24px;
+        }
+
+        .actions .button:first-child {
+          grid-column: 1 / -1;
+        }
+
+        .button {
+          width: 100%;
+          padding: 0 10px;
+          font-size: 13px;
+        }
+
+        .hero-stats {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          margin-top: 38px;
+          padding-right: 10px;
+          padding-left: 10px;
+        }
+
+        .hero-stat,
+        .hero-stat + .hero-stat {
+          min-height: 78px;
+          padding: 14px 10px 0 0;
+        }
+
+        .hero-stat + .hero-stat {
+          padding-left: 10px;
+        }
+
+        .hero-stat strong {
+          font-size: 22px;
+        }
+
+        .hero-stat span {
+          font-size: 10px;
         }
 
         section {
           padding: 58px 0;
         }
 
-        h2 {
-          font-size: 31px;
+        .section-heading {
+          font-size: 30px;
         }
 
-        .failure-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .lead {
+          font-size: 15px;
+        }
+
+        .result-highlights {
+          gap: 20px 12px;
+          margin-top: 36px;
+        }
+
+        .result-highlight strong {
+          font-size: 25px;
+        }
+
+        .result-highlight span {
+          font-size: 12px;
+        }
+
+        .co-copy p:last-child {
+          font-size: 16px;
+        }
+
+        .footer-inner {
+          flex-direction: column;
+          gap: 8px;
         }
       }
 
-      @media (max-width: 560px) {
-        .actions {
-          display: grid;
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
         }
 
-        .button {
-          width: 100%;
-        }
-
-        .hero-metrics {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .metric {
-          min-height: 86px;
-          padding: 14px;
-        }
-
-        .metric strong {
-          font-size: 24px;
-        }
-
-        .failure-grid {
-          grid-template-columns: 1fr;
+        .button,
+        .nav-links a {
+          transition: none;
         }
       }
     </style>
   </head>
   <body>
     <header class="site-header">
-      <nav class="nav" aria-label="Primary">
+      <nav class="nav container" aria-label="Primary navigation">
         <a class="brand" href="#top" aria-label="HarnessX home">
-          <img src="https://raw.githubusercontent.com/Darwin-Agent/HarnessX/main/docs/assets/harnessx_logo.png" alt="" />
-          <span>Harness<span>X</span></span>
+          <span class="brand-mark" aria-hidden="true">X</span>
+          <span>Harness<span class="brand-x">X</span></span>
         </a>
         <div class="nav-links">
           <a href="#overview">Overview</a>
-          <a href="#composition">Method</a>
+          <a href="#method">Method</a>
           <a href="#results">Results</a>
           <a href="#paper">Paper</a>
-          <a href="https://github.com/Darwin-Agent/HarnessX">GitHub</a>
+          <a href="https://github.com/Darwin-Agent/HarnessX/blob/main/README_zh.md">中文</a>
+          <a class="nav-github" href="https://github.com/Darwin-Agent/HarnessX">GitHub</a>
         </div>
       </nav>
     </header>
 
     <main id="top">
-      <section class="hero" aria-label="HarnessX">
-        <div class="hero-inner">
-          <p class="eyebrow">Technical Report</p>
-          <h1>Harness<span class="mark">X</span></h1>
-          <p class="subtitle">A Composable, Adaptive, and Evolvable Agent Harness Foundry</p>
-          <p class="hero-copy">
-            HarnessX treats the runtime harness as a first-class interface between model and
-            environment. Typed processors compose behavior, AEGIS evolves harnesses from execution
-            traces, and model-harness co-evolution turns those trajectories into training signal.
-          </p>
-          <div class="actions">
-            <a class="button primary" href="assets/paper/HarnessX_Tech_Report.pdf">Read Paper</a>
-            <a class="button" href="https://github.com/Darwin-Agent/HarnessX">GitHub</a>
-            <a class="button" href="#results">View Results</a>
-          </div>
-          <div class="hero-metrics" aria-label="Key results">
-            <div class="metric">
-              <strong>5</strong>
-              <span>benchmarks across retrieval, planning, web, dialogue, and coding</span>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="container">
+          <div class="hero-content">
+            <p class="eyebrow">Agent infrastructure / technical report</p>
+            <h1 id="hero-title">Harness<span class="mark">X</span></h1>
+            <p class="hero-title">Compose, adapt, and evolve the behavior around your agent.</p>
+            <p class="hero-copy">
+              HarnessX makes the runtime harness a typed, serializable interface between model and
+              environment. Reusable processors shape behavior, traces guide evolution, and the
+              resulting trajectories become training signal.
+            </p>
+            <div class="actions">
+              <a class="button primary" href="assets/paper/HarnessX_Tech_Report.pdf">Read the paper</a>
+              <a class="button secondary" href="https://github.com/Darwin-Agent/HarnessX">View on GitHub</a>
+              <a class="button secondary" href="#results">See results</a>
             </div>
-            <div class="metric">
-              <strong>15</strong>
-              <span>model-benchmark configurations evaluated with pass@2</span>
-            </div>
-            <div class="metric">
-              <strong>+14.5%</strong>
-              <span>average absolute gain from harness evolution</span>
-            </div>
-            <div class="metric">
-              <strong>+44.0%</strong>
-              <span>largest observed gain on ALFWorld with Qwen3.5-9B</span>
+            <div class="hero-stats" aria-label="Project highlights">
+              <div class="hero-stat">
+                <strong>5</strong>
+                <span>benchmarks</span>
+              </div>
+              <div class="hero-stat">
+                <strong>15</strong>
+                <span>model-benchmark configurations</span>
+              </div>
+              <div class="hero-stat">
+                <strong>+14.5%</strong>
+                <span>average gain from harness evolution</span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="overview">
-        <div class="section-inner">
-          <div class="section-head">
+      <section id="overview" aria-labelledby="overview-title">
+        <div class="container">
+          <div class="section-intro">
             <div>
-              <p class="section-kicker">Overview</p>
-              <h2>The harness, not only the model, determines agent performance.</h2>
+              <p class="section-label">Overview</p>
+              <h2 id="overview-title" class="section-heading">
+                The harness matters as much as the model.
+              </h2>
             </div>
             <p class="lead">
-              HarnessX separates model selection from behavior. A harness is a typed, serializable,
-              substitutable configuration that controls context, tools, memory, execution, reward,
-              safety, observability, and the training bridge.
+              Keep model selection separate from behavior. A HarnessConfig describes context,
+              tools, memory, control, evaluation, safety, observability, and training export in one
+              composable object.
             </p>
           </div>
-          <div class="grid-3">
-            <article class="card accent-orange">
-              <h3>Compose</h3>
-              <p>
-                Behavior is assembled from processors attached to lifecycle hooks, enabling scoped
-                insertion, replacement, and removal without rewriting the agent.
-              </p>
+
+          <div class="pillars">
+            <article class="pillar">
+              <span class="pillar-number">01 / Compose</span>
+              <h3>Change behavior without rewriting the agent.</h3>
+              <p>Attach, replace, or remove typed processors at lifecycle hooks.</p>
             </article>
-            <article class="card accent-teal">
-              <h3>Adapt</h3>
-              <p>
-                AEGIS analyzes traces, plans edits, generates candidates, and gates changes through
-                auditable acceptance checks.
-              </p>
+            <article class="pillar">
+              <span class="pillar-number">02 / Adapt</span>
+              <h3>Search the harness from execution traces.</h3>
+              <p>AEGIS proposes scoped edits and gates them with auditable checks.</p>
             </article>
-            <article class="card accent-green">
-              <h3>Evolve</h3>
-              <p>
-                Reward-annotated trajectories feed model training, so improved harnesses produce
-                better data and better models improve later harness search.
-              </p>
+            <article class="pillar">
+              <span class="pillar-number">03 / Evolve</span>
+              <h3>Turn successful runs into better training data.</h3>
+              <p>Reward-annotated trajectories connect runtime improvement to model learning.</p>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="figure-band" aria-label="HarnessX architecture">
-        <div class="section-inner">
-          <div class="figure-frame">
+      <section class="visual-section" aria-labelledby="architecture-title">
+        <div class="container">
+          <p class="section-label">Architecture</p>
+          <h2 id="architecture-title" class="section-heading">One core, many agent behaviors.</h2>
+          <div class="visual-frame" style="margin-top: 34px">
             <img
-              src="https://raw.githubusercontent.com/Darwin-Agent/HarnessX/main/docs/assets/harnessx_architecture.png"
-              alt="HarnessX architecture showing compose, adapt, and evolve loops around the HarnessX core"
+              src="assets/paper/harnessx_architecture.png"
+              alt="HarnessX architecture: model, harness, processors, tools, memory, and trajectory loops"
+              width="2720"
+              height="1568"
+              loading="lazy"
+              decoding="async"
             />
           </div>
           <p class="caption">
-            HarnessX exposes the runtime interface as a composable substrate: reusable processors,
-            adaptive harness search, and training-ready trajectories share the same execution loop.
+            A single run loop hosts interchangeable processor bundles, adaptive search, and
+            training-ready trajectories.
           </p>
         </div>
       </section>
 
-      <section id="composition" class="method">
-        <div class="section-inner">
-          <div class="section-head">
+      <section id="method" class="method" aria-labelledby="method-title">
+        <div class="container">
+          <div class="section-intro">
             <div>
-              <p class="section-kicker">Method</p>
-              <h2>A typed substrate for trace-driven improvement.</h2>
+              <p class="section-label">Method</p>
+              <h2 id="method-title" class="section-heading">Trace-driven improvement, made explicit.</h2>
             </div>
             <p class="lead">
-              The report frames harness evolution as a symbolic-space analogue of reinforcement
-              learning: harness configurations are states, typed edits are actions, traces and
-              verifier scores are feedback, and deterministic gates govern transitions.
+              Harness configurations behave like states, typed edits like actions, and verifier
+              scores like feedback. Deterministic gates decide what ships.
             </p>
           </div>
-          <div class="timeline">
-            <article class="step">
-              <h3>Harness Composition</h3>
-              <p>
-                Eight lifecycle hooks and nine behavior dimensions make prompts, tools, control
-                policies, memory, observability, and training export explicit parts of the harness.
-              </p>
+
+          <div class="method-steps">
+            <article class="method-step">
+              <span class="step-index">1</span>
+              <h3>Compose</h3>
+              <p>Make prompts, tools, memory, control, and observability first-class dimensions.</p>
             </article>
-            <article class="step">
-              <h3>AEGIS Adaptation</h3>
-              <p>
-                A four-stage pipeline compresses trajectories, proposes scoped edits, generates
-                candidate code/configuration changes, and critiques them before shipping.
-              </p>
+            <article class="method-step">
+              <span class="step-index">2</span>
+              <h3>Adapt</h3>
+              <p>Digest trajectories, plan a bounded edit, generate candidates, then critique them.</p>
             </article>
-            <article class="step">
-              <h3>Model-Harness Co-Evolution</h3>
-              <p>
-                Cross-harness GRPO trains the model on replay from multiple harness versions,
-                lifting performance beyond the harness-only scaffolding ceiling.
-              </p>
+            <article class="method-step">
+              <span class="step-index">3</span>
+              <h3>Evolve</h3>
+              <p>Feed accepted trajectories into model training and continue the search loop.</p>
             </article>
           </div>
-          <div class="figure-frame" style="margin-top: 28px">
+
+          <div class="visual-frame method-figure">
             <img
               src="assets/paper/Harness_Evolution.png"
-              alt="AEGIS harness evolution loop with digester, planner, evolver, critic, and gate"
+              alt="AEGIS evolution loop with digester, planner, evolver, critic, and gate"
+              width="2736"
+              height="1122"
+              loading="lazy"
+              decoding="async"
             />
           </div>
         </div>
       </section>
 
-      <section id="results" class="results">
-        <div class="section-inner">
-          <div class="section-head">
+      <section id="results" class="results" aria-labelledby="results-title">
+        <div class="container">
+          <div class="section-intro">
             <div>
-              <p class="section-kicker">Results</p>
-              <h2>Harness evolution improves 14 of 15 configurations.</h2>
+              <p class="section-label">Results</p>
+              <h2 id="results-title" class="section-heading">Better scaffolding, measurable gains.</h2>
             </div>
             <p class="lead">
-              Across GAIA, ALFWorld, WebShop, &tau;<sup>3</sup>-Bench, and SWE-bench Verified,
-              HarnessX reports average gains of +14.5%, with the strongest gains on weaker task
-              agents where behavioral scaffolding matters most.
+              Across GAIA, ALFWorld, WebShop, tau<sup>3</sup>-Bench, and SWE-bench Verified,
+              harness evolution improves 14 of 15 evaluated configurations.
             </p>
           </div>
-          <div class="table-wrap" role="region" aria-label="Main results table">
+
+          <div class="result-highlights" aria-label="Key results">
+            <div class="result-highlight">
+              <strong>+44.0%</strong>
+              <span>largest gain, ALFWorld / Qwen3.5-9B</span>
+            </div>
+            <div class="result-highlight">
+              <strong>97.8</strong>
+              <span>best evolved score, ALFWorld / GPT-5.4</span>
+            </div>
+            <div class="result-highlight">
+              <strong>+18.2%</strong>
+              <span>SWE-bench gain for GPT-5.4 and Qwen3.5-9B</span>
+            </div>
+            <div class="result-highlight">
+              <strong>+4.7%</strong>
+              <span>co-evolution lift beyond harness-only search</span>
+            </div>
+          </div>
+
+          <div class="table-wrap" role="region" aria-label="Representative harness evolution results" tabindex="0">
             <table>
               <thead>
                 <tr>
-                  <th>Benchmark</th>
-                  <th>Task Agent</th>
+                  <th>Benchmark / agent</th>
                   <th>Initial</th>
                   <th>Evolved</th>
                   <th>Gain</th>
-                  <th>Best Round</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>ALFWorld</td>
-                  <td>Claude Sonnet 4.6</td>
-                  <td>83.6</td>
-                  <td>94.8</td>
-                  <td class="gain">+11.2</td>
-                  <td>7</td>
-                </tr>
-                <tr>
-                  <td>ALFWorld</td>
-                  <td>GPT-5.4</td>
-                  <td>76.9</td>
-                  <td class="peak">97.8</td>
-                  <td class="gain">+20.9</td>
-                  <td>4</td>
-                </tr>
-                <tr>
-                  <td>ALFWorld</td>
-                  <td>Qwen3.5-9B</td>
+                  <td>ALFWorld / Qwen3.5-9B</td>
                   <td>53.0</td>
                   <td>97.0</td>
                   <td class="gain">+44.0</td>
-                  <td>9</td>
                 </tr>
                 <tr>
-                  <td>WebShop</td>
-                  <td>Claude Sonnet 4.6</td>
-                  <td>60.0</td>
-                  <td class="peak">76.0</td>
-                  <td class="gain">+16.0</td>
-                  <td>7</td>
-                </tr>
-                <tr>
-                  <td>WebShop</td>
-                  <td>GPT-5.4</td>
+                  <td>WebShop / GPT-5.4</td>
                   <td>55.0</td>
                   <td>73.0</td>
                   <td class="gain">+18.0</td>
-                  <td>8</td>
                 </tr>
                 <tr>
-                  <td>WebShop</td>
-                  <td>Qwen3.5-9B</td>
-                  <td>36.0</td>
-                  <td>49.0</td>
-                  <td class="gain">+13.0</td>
-                  <td>7</td>
-                </tr>
-                <tr>
-                  <td>GAIA</td>
-                  <td>Claude Sonnet 4.6</td>
+                  <td>GAIA / Claude Sonnet 4.6</td>
                   <td>73.8</td>
-                  <td class="peak">83.5</td>
+                  <td>83.5</td>
                   <td class="gain">+9.7</td>
-                  <td>11</td>
                 </tr>
                 <tr>
-                  <td>GAIA</td>
-                  <td>GPT-5.4</td>
-                  <td>73.8</td>
-                  <td>73.8</td>
-                  <td>0.0</td>
-                  <td>4</td>
-                </tr>
-                <tr>
-                  <td>GAIA</td>
-                  <td>Qwen3.5-9B</td>
-                  <td>20.3</td>
-                  <td>37.4</td>
-                  <td class="gain">+17.1</td>
-                  <td>4</td>
-                </tr>
-                <tr>
-                  <td>SWE-bench Verified</td>
-                  <td>Claude Sonnet 4.6</td>
-                  <td>76.4</td>
-                  <td class="peak">87.3</td>
-                  <td class="gain">+10.9</td>
-                  <td>3</td>
-                </tr>
-                <tr>
-                  <td>SWE-bench Verified</td>
-                  <td>GPT-5.4</td>
+                  <td>SWE-bench Verified / GPT-5.4</td>
                   <td>45.5</td>
                   <td>63.6</td>
                   <td class="gain">+18.2</td>
-                  <td>3</td>
                 </tr>
                 <tr>
-                  <td>SWE-bench Verified</td>
-                  <td>Qwen3.5-9B</td>
-                  <td>23.6</td>
-                  <td>41.8</td>
-                  <td class="gain">+18.2</td>
-                  <td>2</td>
-                </tr>
-                <tr>
-                  <td>&tau;<sup>3</sup>-Bench Avg.</td>
-                  <td>Claude Sonnet 4.6</td>
-                  <td>89.6</td>
-                  <td class="peak">95.0</td>
-                  <td class="gain">+5.4</td>
-                  <td>--</td>
-                </tr>
-                <tr>
-                  <td>&tau;<sup>3</sup>-Bench Avg.</td>
-                  <td>GPT-5.4</td>
+                  <td>tau<sup>3</sup>-Bench / GPT-5.4</td>
                   <td>76.2</td>
                   <td>90.7</td>
                   <td class="gain">+14.5</td>
-                  <td>--</td>
-                </tr>
-                <tr>
-                  <td>&tau;<sup>3</sup>-Bench Avg.</td>
-                  <td>Qwen3.5-9B</td>
-                  <td>93.5</td>
-                  <td>94.6</td>
-                  <td class="gain">+1.1</td>
-                  <td>--</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div class="figure-frame result-figure">
+
+          <details class="results-details">
+            <summary>Show all 15 configurations</summary>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Benchmark</th>
+                    <th>Task agent</th>
+                    <th>Initial</th>
+                    <th>Evolved</th>
+                    <th>Gain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>ALFWorld</td><td>Claude Sonnet 4.6</td><td>83.6</td><td>94.8</td><td class="gain">+11.2</td></tr>
+                  <tr><td>ALFWorld</td><td>GPT-5.4</td><td>76.9</td><td>97.8</td><td class="gain">+20.9</td></tr>
+                  <tr><td>ALFWorld</td><td>Qwen3.5-9B</td><td>53.0</td><td>97.0</td><td class="gain">+44.0</td></tr>
+                  <tr><td>WebShop</td><td>Claude Sonnet 4.6</td><td>60.0</td><td>76.0</td><td class="gain">+16.0</td></tr>
+                  <tr><td>WebShop</td><td>GPT-5.4</td><td>55.0</td><td>73.0</td><td class="gain">+18.0</td></tr>
+                  <tr><td>WebShop</td><td>Qwen3.5-9B</td><td>36.0</td><td>49.0</td><td class="gain">+13.0</td></tr>
+                  <tr><td>GAIA</td><td>Claude Sonnet 4.6</td><td>73.8</td><td>83.5</td><td class="gain">+9.7</td></tr>
+                  <tr><td>GAIA</td><td>GPT-5.4</td><td>73.8</td><td>73.8</td><td>0.0</td></tr>
+                  <tr><td>GAIA</td><td>Qwen3.5-9B</td><td>20.3</td><td>37.4</td><td class="gain">+17.1</td></tr>
+                  <tr><td>SWE-bench Verified</td><td>Claude Sonnet 4.6</td><td>76.4</td><td>87.3</td><td class="gain">+10.9</td></tr>
+                  <tr><td>SWE-bench Verified</td><td>GPT-5.4</td><td>45.5</td><td>63.6</td><td class="gain">+18.2</td></tr>
+                  <tr><td>SWE-bench Verified</td><td>Qwen3.5-9B</td><td>23.6</td><td>41.8</td><td class="gain">+18.2</td></tr>
+                  <tr><td>tau<sup>3</sup>-Bench</td><td>Claude Sonnet 4.6</td><td>89.6</td><td>95.0</td><td class="gain">+5.4</td></tr>
+                  <tr><td>tau<sup>3</sup>-Bench</td><td>GPT-5.4</td><td>76.2</td><td>90.7</td><td class="gain">+14.5</td></tr>
+                  <tr><td>tau<sup>3</sup>-Bench</td><td>Qwen3.5-9B</td><td>93.5</td><td>94.6</td><td class="gain">+1.1</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <div class="visual-frame result-figure">
             <img
               src="assets/paper/Evolution_Main.png"
-              alt="Evolution trajectories across benchmarks and task agents"
+              alt="Harness evolution trajectories across five benchmarks"
+              width="3625"
+              height="2048"
+              loading="lazy"
+              decoding="async"
             />
           </div>
         </div>
       </section>
 
-      <section aria-label="Co-evolution">
-        <div class="section-inner split">
-          <div class="figure-frame">
+      <section class="co-evolution" aria-labelledby="coevolution-title">
+        <div class="container co-grid">
+          <div class="visual-frame">
             <img
               src="assets/paper/coevolution_merged.png"
-              alt="Co-evolution compared with harness-only evolution on GAIA and WebShop"
+              alt="Model-harness co-evolution compared with harness-only evolution"
+              width="3190"
+              height="1090"
+              loading="lazy"
+              decoding="async"
             />
           </div>
-          <div>
-            <p class="section-kicker">Co-Evolution</p>
-            <h2>Closing the loop between runtime search and model learning.</h2>
-            <div class="quote-panel" style="margin-top: 20px">
-              <p>
-                On GAIA and WebShop with Qwen3.5-9B, interleaving cross-harness GRPO with
-                harness evolution raises peak success by +4.3% and +5.0%, averaging +4.7%
-                beyond harness-only evolution.
-              </p>
-            </div>
+          <div class="co-copy">
+            <p class="section-label">Co-evolution</p>
+            <h2 id="coevolution-title" class="section-heading">Close the loop between search and learning.</h2>
+            <p>
+              Interleaving cross-harness GRPO with harness evolution adds an average +4.7% beyond
+              harness-only search on GAIA and WebShop with Qwen3.5-9B.
+            </p>
           </div>
         </div>
       </section>
 
-      <section class="figure-band" aria-label="Failure analysis">
-        <div class="section-inner">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">Auditability</p>
-              <h2>Trace richness makes evolution failures diagnosable.</h2>
-            </div>
+      <section id="paper" class="paper" aria-labelledby="paper-title">
+        <div class="container paper-grid">
+          <div class="paper-copy">
+            <p class="section-label">Read and run</p>
+            <h2 id="paper-title" class="section-heading">Start with one harness config.</h2>
             <p class="lead">
-              The report documents reward hacking, catastrophic forgetting, and under-exploration
-              as concrete harness-evolution risks. AEGIS keeps shipped edits, rejection reasons,
-              rollback targets, and trace evidence inspectable.
+              Read the technical report for the full evaluation, or open the repository for the
+              install script, examples, benchmarks, and the Python API.
             </p>
+            <div class="paper-actions">
+              <a class="button primary" href="assets/paper/HarnessX_Tech_Report.pdf">Download report</a>
+              <a class="button" href="https://github.com/Darwin-Agent/HarnessX">Open repository</a>
+            </div>
           </div>
-          <div class="failure-grid">
-            <figure>
-              <img src="assets/paper/case_rh_gaia.png" alt="Reward hacking case on GAIA" />
-              <figcaption>Reward hacking surfaced through trace-level evidence on GAIA.</figcaption>
-            </figure>
-            <figure>
-              <img src="assets/paper/case_cf_tau3.png" alt="Catastrophic forgetting case on tau3-Bench" />
-              <figcaption>Accumulated same-type edits triggered a Telecom regression.</figcaption>
-            </figure>
-            <figure>
-              <img src="assets/paper/case_ue_alfworld.png" alt="Under-exploration case on ALFWorld" />
-              <figcaption>Decaying ship-prediction accuracy exposed prompt-space exhaustion.</figcaption>
-            </figure>
-            <figure>
-              <img src="assets/paper/AHE_Evo.jpg" alt="AEGIS evolution artifact overview" />
-              <figcaption>Auditable manifests and gates constrain accepted evolution.</figcaption>
-            </figure>
-          </div>
-        </div>
-      </section>
+          <pre><code>from harnessx import BaseTask, HarnessConfig
+from harnessx.core.model_config import ModelConfig
+from harnessx.providers.anthropic_provider import AnthropicProvider
 
-      <section id="paper" class="citation">
-        <div class="section-inner">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">Paper</p>
-              <h2>HarnessX technical report.</h2>
-            </div>
-            <p class="lead">
-              Darwin Agent Team. Core contributors: Tingyang Chen, Shuo Lu, Kang Zhao,
-              Weicheng Meng, Kun Shao, and Jian Luan.
-            </p>
-          </div>
-          <pre><code>@misc{harnessx2026,
-  title  = {HarnessX: A Composable, Adaptive, and Evolvable Agent Harness Foundry},
-  author = {Darwin Agent Team},
-  year   = {2026},
-  url    = {https://github.com/Darwin-Agent/HarnessX}
-}</code></pre>
+model = ModelConfig(main=AnthropicProvider("claude-sonnet-4-6"))
+harness = model.agentic(HarnessConfig())
+result = await harness.run(BaseTask(description="What is 2 + 2?"))</code></pre>
         </div>
       </section>
     </main>
 
     <footer class="footer">
-      <div class="footer-inner">
-        <span>HarnessX</span>
+      <div class="container footer-inner">
+        <span>HarnessX / Darwin Agent Team</span>
         <a href="https://github.com/Darwin-Agent/HarnessX">github.com/Darwin-Agent/HarnessX</a>
       </div>
     </footer>

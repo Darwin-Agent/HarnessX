@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" fill="none">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="hex-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="50%" stop-color="#6D28D9"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Hexagonal composable symbol -->
+  <g transform="translate(36, 60)">
+    <!-- Central hexagon -->
+    <polygon points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11"
+             fill="none" stroke="url(#hex-grad)" stroke-width="2.5"/>
+    <!-- Three connection nodes -->
+    <circle cx="-26" cy="-15" r="3.5" fill="#2563EB"/>
+    <circle cx="26"  cy="-15" r="3.5" fill="#6D28D9"/>
+    <circle cx="0"   cy="28"  r="3.5" fill="#7C3AED"/>
+    <!-- Connection lines (dashed) -->
+    <line x1="-22" y1="-13" x2="-19" y2="-11" stroke="#2563EB" stroke-width="1.5" stroke-dasharray="2,2"/>
+    <line x1="22"  y1="-13" x2="19"  y2="-11" stroke="#6D28D9" stroke-width="1.5" stroke-dasharray="2,2"/>
+    <line x1="0"   y1="25"  x2="0"   y2="22"  stroke="#7C3AED" stroke-width="1.5" stroke-dasharray="2,2"/>
+    <!-- Inner dot -->
+    <circle cx="0" cy="0" r="4" fill="url(#hex-grad)" opacity="0.8"/>
+  </g>
+
+  <!-- Text: "Harness" (light) + "X" (bold) -->
+  <text x="76" y="76" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="52">
+    <tspan fill="url(#grad)" font-weight="300" letter-spacing="-1">Harness</tspan><tspan fill="url(#grad)" font-weight="700" letter-spacing="-2">X</tspan>
+  </text>
+
+  <!-- Subtle tagline -->
+  <text x="78" y="100" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif"
+        font-size="13" fill="#64748B" letter-spacing="0.5" font-weight="400">
+    composable · observable · trainable
+  </text>
+</svg>
