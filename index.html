@@ -3,38 +3,35 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#111820" />
-    <title>HarnessX | Compose, adapt, and evolve agent behavior</title>
+    <meta name="theme-color" content="#ffffff" />
+    <title>HarnessX | Composable, adaptive, and evolvable agent harnesses</title>
     <meta
       name="description"
-      content="HarnessX is a composable, adaptive, and evolvable agent harness foundry. Compose behavior, evolve harnesses from traces, and train models on better trajectories."
+      content="HarnessX is a composable, adaptive, and evolvable agent harness foundry from the Darwin Agent Team."
     />
     <meta property="og:title" content="HarnessX | Agent Harness Foundry" />
     <meta
       property="og:description"
-      content="Compose, adapt, and evolve the runtime harness around your agent."
+      content="Compose runtime behavior, adapt harnesses from traces, and evolve models from better trajectories."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://darwin-agent.github.io/HarnessX/" />
     <meta
       property="og:image"
-      content="https://darwin-agent.github.io/HarnessX/assets/paper/harnessx_architecture.png"
+      content="https://darwin-agent.github.io/HarnessX/assets/paper/site/overview.webp"
     />
     <link rel="icon" href="assets/logo.svg" />
     <style>
       :root {
         color-scheme: light;
-        --ink: #111820;
-        --muted: #5c6875;
-        --paper: #f4f6f8;
+        --ink: #17181b;
+        --muted: #697180;
+        --line: #e8ebef;
+        --soft: #f7f8fa;
+        --orange: #ed722e;
+        --orange-dark: #c94f12;
+        --green: #18755b;
         --white: #ffffff;
-        --line: #d8e0e7;
-        --orange: #ed6b2d;
-        --orange-dark: #bb4b19;
-        --teal: #167c80;
-        --blue: #255b78;
-        --night: #121b24;
-        --shadow: 0 18px 50px rgba(17, 24, 32, 0.12);
       }
 
       *,
@@ -45,17 +42,17 @@
 
       html {
         scroll-behavior: smooth;
+        scroll-padding-top: 88px;
       }
 
       body {
         margin: 0;
         overflow-x: hidden;
-        background: var(--paper);
+        background: var(--white);
         color: var(--ink);
-        font-family:
-          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         letter-spacing: 0;
+        -webkit-font-smoothing: antialiased;
       }
 
       a {
@@ -63,788 +60,628 @@
         text-decoration: none;
       }
 
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
       img {
         display: block;
         max-width: 100%;
       }
 
+      h1,
+      h2,
+      h3,
+      p,
+      figure {
+        margin: 0;
+      }
+
       .container {
-        width: min(1120px, calc(100% - 48px));
-        margin: 0 auto;
+        width: min(1080px, calc(100% - 48px));
+        margin-inline: auto;
+      }
+
+      .reading-width {
+        max-width: 760px;
       }
 
       .site-header {
         position: fixed;
-        z-index: 10;
+        z-index: 20;
         inset: 0 0 auto;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-        background: rgba(17, 24, 32, 0.88);
-        backdrop-filter: blur(14px);
-        color: var(--white);
+        height: 64px;
+        border-bottom: 1px solid rgba(232, 235, 239, 0.88);
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(12px);
       }
 
       .nav {
-        min-height: 70px;
+        height: 100%;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 24px;
+        gap: 28px;
       }
 
       .brand {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 18px;
-        font-weight: 850;
+        flex: 0 0 auto;
+        font-size: 19px;
+        font-weight: 820;
       }
 
-      .brand-mark {
-        display: inline-grid;
-        width: 28px;
-        height: 28px;
-        place-items: center;
-        border: 1px solid rgba(255, 255, 255, 0.46);
-        border-radius: 7px;
-        color: var(--orange);
-        font-size: 15px;
-        font-weight: 900;
-      }
-
-      .brand-x,
-      .mark {
+      .brand span,
+      .accent {
         color: var(--orange);
       }
 
       .nav-links {
         display: flex;
         align-items: center;
-        gap: 22px;
-        color: rgba(255, 255, 255, 0.76);
-        font-size: 13px;
+        gap: 28px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 650;
       }
 
-      .nav-links a {
-        transition: color 160ms ease;
+      .nav-links a,
+      .footer a {
+        transition: color 150ms ease;
       }
 
       .nav-links a:hover,
-      .nav-links a:focus-visible {
-        color: var(--white);
+      .nav-links a:focus-visible,
+      .footer a:hover,
+      .footer a:focus-visible {
+        color: var(--orange-dark);
       }
 
-      .nav-github {
-        border: 1px solid rgba(255, 255, 255, 0.34);
+      .mobile-paper {
+        display: none;
+        min-height: 36px;
+        align-items: center;
+        border: 1px solid var(--line);
         border-radius: 6px;
-        padding: 8px 12px;
-        color: var(--white) !important;
-        font-weight: 750;
+        padding: 0 13px;
+        font-size: 13px;
+        font-weight: 720;
       }
 
       .hero {
-        position: relative;
-        min-height: 760px;
-        display: flex;
-        align-items: center;
-        overflow: hidden;
-        padding: 132px 0 94px;
-        background-color: #121a23;
-        background-image:
-          linear-gradient(180deg, rgba(12, 18, 25, 0.12) 0%, rgba(12, 18, 25, 0.28) 52%, rgba(12, 18, 25, 0.92) 88%, rgba(12, 18, 25, 0.98) 100%),
-          linear-gradient(90deg, rgba(12, 18, 25, 0.97) 0%, rgba(12, 18, 25, 0.9) 42%, rgba(12, 18, 25, 0.42) 78%, rgba(12, 18, 25, 0.2) 100%),
-          url("assets/paper/fig1.png");
-        background-position: center, 68% center;
-        background-repeat: no-repeat;
-        background-size: cover;
-        color: var(--white);
+        padding: 132px 0 46px;
+        text-align: center;
       }
 
-      .hero::after {
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        height: 54px;
-        background: linear-gradient(180deg, transparent, var(--paper));
-        content: "";
-        pointer-events: none;
-      }
-
-      .hero-content {
-        position: relative;
-        z-index: 1;
-        max-width: 680px;
-      }
-
-      .eyebrow,
-      .section-label {
-        color: #f9b391;
-        font-size: 12px;
-        font-weight: 850;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .eyebrow {
+      .report-label {
         display: inline-flex;
+        min-height: 32px;
         align-items: center;
-        gap: 10px;
-      }
-
-      .eyebrow::before {
-        width: 34px;
-        height: 2px;
-        background: var(--orange);
-        content: "";
-      }
-
-      h1,
-      h2,
-      h3,
-      p {
-        margin: 0;
+        border: 1px solid #f3c5aa;
+        border-radius: 999px;
+        padding: 0 14px;
+        background: #fff8f4;
+        color: var(--orange-dark);
+        font-size: 13px;
+        font-weight: 720;
       }
 
       h1 {
-        max-width: 640px;
         margin-top: 24px;
-        font-size: 82px;
-        font-weight: 900;
-        line-height: 0.96;
+        font-size: 72px;
+        font-weight: 850;
+        line-height: 1;
       }
 
       .hero-title {
-        max-width: 600px;
-        margin-top: 22px;
-        color: rgba(255, 255, 255, 0.92);
-        font-size: 28px;
-        font-weight: 720;
-        line-height: 1.25;
+        max-width: 880px;
+        margin: 22px auto 0;
+        font-size: 26px;
+        font-weight: 520;
+        line-height: 1.42;
       }
 
-      .hero-copy {
-        max-width: 620px;
-        margin-top: 20px;
-        color: rgba(255, 255, 255, 0.72);
-        font-size: 17px;
+      .hero-meta {
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 14px;
         line-height: 1.7;
+      }
+
+      .meta-separator {
+        margin-inline: 10px;
+        color: #b2b8c1;
       }
 
       .actions {
         display: flex;
-        flex-wrap: wrap;
+        justify-content: center;
         gap: 12px;
         margin-top: 30px;
       }
 
       .button {
         display: inline-flex;
-        min-height: 44px;
+        min-width: 132px;
+        min-height: 46px;
         align-items: center;
         justify-content: center;
-        border: 1px solid rgba(255, 255, 255, 0.32);
+        border: 1px solid var(--line);
         border-radius: 7px;
-        padding: 0 17px;
-        color: var(--white);
+        padding: 0 19px;
+        background: var(--white);
         font-size: 14px;
-        font-weight: 780;
+        font-weight: 760;
         transition:
-          transform 160ms ease,
-          background 160ms ease,
-          border-color 160ms ease;
+          border-color 150ms ease,
+          background 150ms ease,
+          color 150ms ease;
       }
 
       .button:hover,
       .button:focus-visible {
-        transform: translateY(-1px);
-        border-color: rgba(255, 255, 255, 0.7);
+        border-color: #bbc1ca;
+        background: var(--soft);
       }
 
-      .button.primary {
+      .button-primary {
         border-color: var(--orange);
         background: var(--orange);
+        color: var(--white);
       }
 
-      .button.secondary {
-        background: rgba(255, 255, 255, 0.08);
+      .button-primary:hover,
+      .button-primary:focus-visible {
+        border-color: var(--orange-dark);
+        background: var(--orange-dark);
       }
 
-      .hero-stats {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        max-width: 700px;
-        margin-top: 58px;
-        padding: 0 16px 16px;
-        border-top: 1px solid rgba(255, 255, 255, 0.28);
-        background: rgba(8, 14, 20, 0.64);
+      .overview-figure {
+        padding: 14px 0 42px;
       }
 
-      .hero-stat {
-        min-height: 86px;
-        padding: 18px 22px 0 0;
-        border-right: 1px solid rgba(255, 255, 255, 0.22);
+      .paper-figure {
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 28px 0;
       }
 
-      .hero-stat + .hero-stat {
-        padding-left: 22px;
-      }
-
-      .hero-stat:last-child {
-        border-right: 0;
-      }
-
-      .hero-stat strong {
+      .paper-figure a {
         display: block;
-        font-size: 28px;
-        line-height: 1;
       }
 
-      .hero-stat span {
-        display: block;
-        max-width: 160px;
-        margin-top: 9px;
-        color: rgba(255, 255, 255, 0.65);
-        font-size: 12px;
-        line-height: 1.35;
+      .paper-figure img {
+        width: 100%;
+        height: auto;
       }
 
-      section {
-        padding: 96px 0;
+      figcaption {
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+        text-align: center;
       }
 
-      .section-label {
+      section.content-section {
+        padding: 88px 0;
+      }
+
+      .section-kicker {
+        margin-bottom: 13px;
         color: var(--orange-dark);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
       }
 
-      .section-heading {
-        max-width: 700px;
-        margin-top: 10px;
-        font-size: 42px;
-        line-height: 1.08;
+      h2 {
+        font-size: 38px;
+        font-weight: 790;
+        line-height: 1.18;
       }
 
-      .section-intro {
-        display: grid;
-        grid-template-columns: minmax(0, 0.92fr) minmax(280px, 0.7fr);
-        gap: 64px;
-        align-items: end;
-      }
-
-      .lead {
+      .section-lead {
+        margin-top: 20px;
         color: var(--muted);
-        font-size: 16px;
-        line-height: 1.7;
+        font-size: 18px;
+        line-height: 1.72;
       }
 
-      .pillars {
+      .capabilities {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 28px;
-        margin-top: 58px;
+        gap: 40px;
+        margin-top: 54px;
       }
 
-      .pillar {
-        min-height: 164px;
-        padding: 20px 20px 0 0;
-        border-top: 2px solid var(--orange);
+      .capability {
+        border-top: 2px solid var(--ink);
+        padding-top: 20px;
       }
 
-      .pillar:nth-child(2) {
-        border-top-color: var(--teal);
-      }
-
-      .pillar:nth-child(3) {
-        border-top-color: var(--blue);
-      }
-
-      .pillar-number {
-        color: var(--muted);
+      .capability-index {
+        color: var(--orange-dark);
         font-size: 12px;
         font-weight: 800;
       }
 
-      .pillar h3 {
-        margin-top: 18px;
-        font-size: 22px;
-      }
-
-      .pillar p {
-        margin-top: 10px;
-        color: var(--muted);
-        font-size: 15px;
-        line-height: 1.6;
-      }
-
-      .visual-section {
-        padding-top: 0;
-        background: var(--white);
-      }
-
-      .visual-frame {
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 12px;
-        background: #fbfcfd;
-        box-shadow: var(--shadow);
-      }
-
-      .visual-frame img {
-        width: 100%;
-        height: auto;
-        border-radius: 4px;
-      }
-
-      .caption {
-        max-width: 780px;
-        margin-top: 14px;
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.55;
-      }
-
-      .method {
-        background: #eaf1f2;
-      }
-
-      .method-steps {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 28px;
-        margin-top: 52px;
-      }
-
-      .method-step {
-        min-height: 206px;
-        padding: 22px 24px 0 0;
-        border-top: 2px solid var(--blue);
-      }
-
-      .method-step:nth-child(2) {
-        border-top-color: var(--teal);
-      }
-
-      .method-step:nth-child(3) {
-        border-top-color: var(--orange);
-      }
-
-      .step-index {
-        display: inline-grid;
-        width: 32px;
-        height: 32px;
-        place-items: center;
-        border-radius: 50%;
-        color: var(--white);
-        background: var(--blue);
-        font-size: 13px;
-        font-weight: 850;
-      }
-
-      .method-step:nth-child(2) .step-index {
-        background: var(--teal);
-      }
-
-      .method-step:nth-child(3) .step-index {
-        background: var(--orange);
-      }
-
-      .method-step h3 {
-        margin-top: 18px;
+      .capability h3 {
+        margin-top: 12px;
         font-size: 21px;
+        font-weight: 760;
+        line-height: 1.25;
       }
 
-      .method-step p {
-        margin-top: 10px;
+      .capability p {
+        margin-top: 12px;
         color: var(--muted);
         font-size: 15px;
-        line-height: 1.6;
+        line-height: 1.65;
       }
 
-      .method-figure {
-        margin-top: 42px;
-      }
-
-      .results {
-        background: var(--night);
-        color: var(--white);
-      }
-
-      .results .section-label {
-        color: #f9b391;
-      }
-
-      .results .lead {
-        color: rgba(255, 255, 255, 0.68);
-      }
-
-      .result-highlights {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 16px;
+      .section-figure {
         margin-top: 48px;
       }
 
-      .result-highlight {
-        padding-top: 16px;
-        border-top: 1px solid rgba(255, 255, 255, 0.36);
+      .soft-band {
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        background: var(--soft);
       }
 
-      .result-highlight strong {
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0;
+        margin-top: 48px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .metric {
+        min-height: 142px;
+        padding: 25px 28px;
+      }
+
+      .metric + .metric {
+        border-left: 1px solid var(--line);
+      }
+
+      .metric strong {
         display: block;
-        color: #ffd0b9;
-        font-size: 30px;
+        color: var(--orange-dark);
+        font-size: 34px;
+        font-weight: 820;
         line-height: 1;
       }
 
-      .result-highlight span {
+      .metric span {
         display: block;
-        margin-top: 9px;
-        color: rgba(255, 255, 255, 0.64);
-        font-size: 13px;
-        line-height: 1.4;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
       }
 
-      .table-wrap {
+      .co-evolution {
+        display: grid;
+        grid-template-columns: minmax(0, 0.88fr) minmax(0, 2.12fr);
+        align-items: center;
+        gap: 48px;
+        margin-top: 68px;
+      }
+
+      .co-evolution h3 {
+        font-size: 28px;
+        font-weight: 770;
+        line-height: 1.25;
+      }
+
+      .co-evolution p {
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.68;
+      }
+
+      .co-evolution .paper-figure {
+        padding: 22px 0;
+      }
+
+      details {
+        margin-top: 32px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      summary {
+        padding: 17px 2px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 720;
+      }
+
+      .table-scroll {
         overflow-x: auto;
-        margin-top: 50px;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        border-radius: 8px;
+        padding-bottom: 18px;
+        overscroll-behavior-inline: contain;
       }
 
       table {
         width: 100%;
+        min-width: 700px;
         border-collapse: collapse;
-        min-width: 640px;
-        font-size: 14px;
+        font-size: 13px;
       }
 
       th,
       td {
-        padding: 14px 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        border-top: 1px solid var(--line);
+        padding: 12px 14px;
         text-align: left;
-        vertical-align: top;
+        white-space: nowrap;
       }
 
       th {
-        color: rgba(255, 255, 255, 0.55);
-        font-size: 11px;
-        font-weight: 750;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 700;
       }
 
-      tbody tr:last-child td {
-        border-bottom: 0;
+      td:not(:first-child),
+      th:not(:first-child) {
+        text-align: right;
       }
 
       .gain {
-        color: #8ee3a8;
-        font-weight: 850;
+        color: var(--green);
+        font-weight: 760;
       }
 
-      .results-details {
-        margin-top: 18px;
-        color: rgba(255, 255, 255, 0.74);
-        font-size: 14px;
+      .citation {
+        padding: 88px 0;
       }
 
-      .results-details summary {
-        display: inline-block;
-        cursor: pointer;
-        color: #ffd0b9;
-        font-weight: 750;
-      }
-
-      .results-details .table-wrap {
-        margin-top: 16px;
-      }
-
-      .result-figure {
-        margin-top: 42px;
-      }
-
-      .co-evolution {
-        background: var(--white);
-      }
-
-      .co-grid {
+      .citation-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.72fr);
-        gap: 56px;
-        align-items: center;
-      }
-
-      .co-copy .section-heading {
-        max-width: 520px;
-      }
-
-      .co-copy p:last-child {
-        max-width: 500px;
-        margin-top: 20px;
-        padding-left: 18px;
-        border-left: 3px solid var(--orange);
-        color: var(--muted);
-        font-size: 17px;
-        line-height: 1.7;
-      }
-
-      .paper {
-        background: var(--paper);
-      }
-
-      .paper-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 0.75fr) minmax(320px, 1fr);
-        gap: 52px;
+        grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
         align-items: start;
+        gap: 64px;
       }
 
-      .paper-copy .section-heading {
-        max-width: 440px;
+      .co-evolution > *,
+      .citation-layout > * {
+        min-width: 0;
       }
 
-      .paper-copy .lead {
-        max-width: 460px;
-        margin-top: 18px;
+      .citation-block {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--white);
       }
 
       pre {
-        overflow-x: auto;
         margin: 0;
-        border: 1px solid #273545;
-        border-radius: 8px;
-        padding: 20px;
-        background: #101820;
-        color: #dce7f0;
-        font-size: 13px;
-        line-height: 1.6;
+        overflow-x: auto;
+        padding: 54px 22px 22px;
+        color: #35393f;
+        font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        white-space: pre;
       }
 
-      .paper-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 26px;
-      }
-
-      .paper .button {
-        border-color: var(--line);
-        color: var(--ink);
+      .copy-button {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        min-height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 0 10px;
         background: var(--white);
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 700;
       }
 
-      .paper .button.primary {
-        border-color: var(--orange);
-        color: var(--white);
-        background: var(--orange);
+      .copy-button:hover,
+      .copy-button:focus-visible {
+        border-color: #bbc1ca;
+        color: var(--ink);
       }
 
       .footer {
-        padding: 30px 0;
         border-top: 1px solid var(--line);
+        padding: 26px 0;
         color: var(--muted);
-        background: var(--paper);
         font-size: 13px;
       }
 
       .footer-inner {
         display: flex;
+        align-items: center;
         justify-content: space-between;
-        gap: 20px;
+        gap: 24px;
       }
 
-      :focus-visible {
-        outline: 3px solid #f6a77f;
-        outline-offset: 3px;
-      }
-
-      @media (max-width: 900px) {
-        .container {
-          width: min(100% - 32px, 1120px);
+      @media (max-width: 820px) {
+        .nav-links {
+          gap: 18px;
         }
 
-        .nav-links a:not(.nav-github) {
+        .nav-links a:nth-child(2),
+        .nav-links a:nth-child(3) {
           display: none;
         }
 
         .hero {
-          min-height: 650px;
-          padding: 116px 0 70px;
-          background-image:
-            linear-gradient(180deg, rgba(12, 18, 25, 0.18) 0%, rgba(12, 18, 25, 0.3) 48%, rgba(12, 18, 25, 0.94) 86%, rgba(12, 18, 25, 0.98) 100%),
-            linear-gradient(180deg, rgba(12, 18, 25, 0.96) 0%, rgba(12, 18, 25, 0.88) 56%, rgba(12, 18, 25, 0.48) 100%),
-            url("assets/paper/fig1.png");
-          background-position: center, 62% center;
+          padding-top: 118px;
         }
 
         h1 {
-          font-size: 54px;
+          font-size: 60px;
         }
 
         .hero-title {
-          max-width: 560px;
           font-size: 23px;
         }
 
-        .hero-copy {
-          font-size: 16px;
+        .capabilities {
+          gap: 24px;
         }
 
-        .hero-stats {
-          margin-top: 42px;
+        .metric {
+          padding-inline: 20px;
         }
 
-        section {
-          padding: 72px 0;
-        }
-
-        .section-intro,
-        .co-grid,
-        .paper-grid {
+        .co-evolution,
+        .citation-layout {
           grid-template-columns: 1fr;
+        }
+
+        .co-evolution {
           gap: 28px;
         }
 
-        .section-heading {
-          font-size: 34px;
+        .co-evolution-copy {
+          max-width: 650px;
         }
 
-        .pillars,
-        .method-steps {
-          grid-template-columns: 1fr;
-          gap: 24px;
-          margin-top: 38px;
-        }
-
-        .pillar,
-        .method-step {
-          min-height: 0;
-          padding-right: 0;
-        }
-
-        .result-highlights {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          row-gap: 28px;
-        }
-
-        .paper-grid {
-          gap: 34px;
+        .citation-layout {
+          gap: 36px;
         }
       }
 
-      @media (max-width: 560px) {
+      @media (max-width: 600px) {
+        html {
+          scroll-padding-top: 76px;
+        }
+
         .container {
-          width: min(100% - 28px, 1120px);
+          width: min(100% - 32px, 1080px);
         }
 
-        .nav {
-          min-height: 62px;
+        .nav-links {
+          display: none;
         }
 
-        .brand {
-          font-size: 17px;
-        }
-
-        .nav-github {
-          padding: 7px 10px;
+        .mobile-paper {
+          display: inline-flex;
         }
 
         .hero {
-          min-height: 650px;
-          padding-top: 102px;
+          padding: 102px 0 34px;
+        }
+
+        .report-label {
+          min-height: 29px;
+          font-size: 12px;
         }
 
         h1 {
           margin-top: 20px;
-          font-size: 48px;
+          font-size: 46px;
         }
 
         .hero-title {
           margin-top: 18px;
-          font-size: 21px;
+          font-size: 20px;
+          line-height: 1.46;
         }
 
-        .hero-copy {
-          margin-top: 16px;
-          font-size: 15px;
-          line-height: 1.58;
-        }
-
-        .actions {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 8px;
-          margin-top: 24px;
-        }
-
-        .actions .button:first-child {
-          grid-column: 1 / -1;
-        }
-
-        .button {
-          width: 100%;
-          padding: 0 10px;
+        .hero-meta {
+          max-width: 310px;
+          margin: 18px auto 0;
           font-size: 13px;
         }
 
-        .hero-stats {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          margin-top: 38px;
-          padding-right: 10px;
-          padding-left: 10px;
+        .meta-separator {
+          display: block;
+          height: 2px;
+          overflow: hidden;
+          opacity: 0;
         }
 
-        .hero-stat,
-        .hero-stat + .hero-stat {
-          min-height: 78px;
-          padding: 14px 10px 0 0;
+        .actions {
+          margin-top: 24px;
         }
 
-        .hero-stat + .hero-stat {
-          padding-left: 10px;
+        .button {
+          min-width: 0;
+          flex: 1 1 0;
+          padding-inline: 14px;
         }
 
-        .hero-stat strong {
-          font-size: 22px;
+        .overview-figure {
+          padding: 8px 0 22px;
         }
 
-        .hero-stat span {
-          font-size: 10px;
+        .paper-figure {
+          padding: 18px 0;
         }
 
-        section {
+        section.content-section,
+        .citation {
           padding: 58px 0;
         }
 
-        .section-heading {
+        h2 {
           font-size: 30px;
         }
 
-        .lead {
-          font-size: 15px;
+        .section-lead {
+          margin-top: 16px;
+          font-size: 16px;
+          line-height: 1.68;
         }
 
-        .result-highlights {
-          gap: 20px 12px;
+        .capabilities {
+          grid-template-columns: 1fr;
+          gap: 30px;
+          margin-top: 38px;
+        }
+
+        .capability {
+          padding-top: 16px;
+        }
+
+        .section-figure {
           margin-top: 36px;
         }
 
-        .result-highlight strong {
-          font-size: 25px;
+        .metrics {
+          grid-template-columns: 1fr;
+          margin-top: 36px;
         }
 
-        .result-highlight span {
-          font-size: 12px;
+        .metric {
+          min-height: 0;
+          padding: 20px 2px;
         }
 
-        .co-copy p:last-child {
-          font-size: 16px;
+        .metric + .metric {
+          border-top: 1px solid var(--line);
+          border-left: 0;
+        }
+
+        .metric strong {
+          font-size: 30px;
+        }
+
+        .co-evolution {
+          margin-top: 52px;
+        }
+
+        .co-evolution h3 {
+          font-size: 24px;
         }
 
         .footer-inner {
+          align-items: flex-start;
           flex-direction: column;
-          gap: 8px;
+          gap: 7px;
         }
       }
 
@@ -854,7 +691,8 @@
         }
 
         .button,
-        .nav-links a {
+        .nav-links a,
+        .footer a {
           transition: none;
         }
       }
@@ -863,246 +701,179 @@
   <body>
     <header class="site-header">
       <nav class="nav container" aria-label="Primary navigation">
-        <a class="brand" href="#top" aria-label="HarnessX home">
-          <span class="brand-mark" aria-hidden="true">X</span>
-          <span>Harness<span class="brand-x">X</span></span>
-        </a>
+        <a class="brand" href="#top" aria-label="HarnessX home">Harness<span>X</span></a>
         <div class="nav-links">
           <a href="#overview">Overview</a>
-          <a href="#method">Method</a>
+          <a href="#aegis">AEGIS</a>
           <a href="#results">Results</a>
-          <a href="#paper">Paper</a>
-          <a href="https://github.com/Darwin-Agent/HarnessX/blob/main/README_zh.md">中文</a>
-          <a class="nav-github" href="https://github.com/Darwin-Agent/HarnessX">GitHub</a>
+          <a href="#citation">Citation</a>
         </div>
+        <a class="mobile-paper" href="assets/paper/HarnessX_Tech_Report.pdf">Paper</a>
       </nav>
     </header>
 
     <main id="top">
       <section class="hero" aria-labelledby="hero-title">
         <div class="container">
-          <div class="hero-content">
-            <p class="eyebrow">Agent infrastructure / technical report</p>
-            <h1 id="hero-title">Harness<span class="mark">X</span></h1>
-            <p class="hero-title">Compose, adapt, and evolve the behavior around your agent.</p>
-            <p class="hero-copy">
-              HarnessX makes the runtime harness a typed, serializable interface between model and
-              environment. Reusable processors shape behavior, traces guide evolution, and the
-              resulting trajectories become training signal.
-            </p>
-            <div class="actions">
-              <a class="button primary" href="assets/paper/HarnessX_Tech_Report.pdf">Read the paper</a>
-              <a class="button secondary" href="https://github.com/Darwin-Agent/HarnessX">View on GitHub</a>
-              <a class="button secondary" href="#results">See results</a>
-            </div>
-            <div class="hero-stats" aria-label="Project highlights">
-              <div class="hero-stat">
-                <strong>5</strong>
-                <span>benchmarks</span>
-              </div>
-              <div class="hero-stat">
-                <strong>15</strong>
-                <span>model-benchmark configurations</span>
-              </div>
-              <div class="hero-stat">
-                <strong>+14.5%</strong>
-                <span>average gain from harness evolution</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="overview" aria-labelledby="overview-title">
-        <div class="container">
-          <div class="section-intro">
-            <div>
-              <p class="section-label">Overview</p>
-              <h2 id="overview-title" class="section-heading">
-                The harness matters as much as the model.
-              </h2>
-            </div>
-            <p class="lead">
-              Keep model selection separate from behavior. A HarnessConfig describes context,
-              tools, memory, control, evaluation, safety, observability, and training export in one
-              composable object.
-            </p>
-          </div>
-
-          <div class="pillars">
-            <article class="pillar">
-              <span class="pillar-number">01 / Compose</span>
-              <h3>Change behavior without rewriting the agent.</h3>
-              <p>Attach, replace, or remove typed processors at lifecycle hooks.</p>
-            </article>
-            <article class="pillar">
-              <span class="pillar-number">02 / Adapt</span>
-              <h3>Search the harness from execution traces.</h3>
-              <p>AEGIS proposes scoped edits and gates them with auditable checks.</p>
-            </article>
-            <article class="pillar">
-              <span class="pillar-number">03 / Evolve</span>
-              <h3>Turn successful runs into better training data.</h3>
-              <p>Reward-annotated trajectories connect runtime improvement to model learning.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="visual-section" aria-labelledby="architecture-title">
-        <div class="container">
-          <p class="section-label">Architecture</p>
-          <h2 id="architecture-title" class="section-heading">One core, many agent behaviors.</h2>
-          <div class="visual-frame" style="margin-top: 34px">
-            <img
-              src="assets/paper/harnessx_architecture.png"
-              alt="HarnessX architecture: model, harness, processors, tools, memory, and trajectory loops"
-              width="2720"
-              height="1568"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-          <p class="caption">
-            A single run loop hosts interchangeable processor bundles, adaptive search, and
-            training-ready trajectories.
+          <p class="report-label">Technical Report &middot; 2026</p>
+          <h1 id="hero-title">Harness<span class="accent">X</span></h1>
+          <p class="hero-title">A Composable, Adaptive, and Evolvable Agent Harness Foundry</p>
+          <p class="hero-meta">
+            Darwin Agent Team
+            <span class="meta-separator" aria-hidden="true">&middot;</span>
+            5 benchmarks
+            <span class="meta-separator" aria-hidden="true">&middot;</span>
+            15 model-benchmark configurations
           </p>
+          <div class="actions">
+            <a class="button button-primary" href="assets/paper/HarnessX_Tech_Report.pdf">Read paper</a>
+            <a class="button" href="https://github.com/Darwin-Agent/HarnessX">GitHub</a>
+          </div>
         </div>
       </section>
 
-      <section id="method" class="method" aria-labelledby="method-title">
-        <div class="container">
-          <div class="section-intro">
-            <div>
-              <p class="section-label">Method</p>
-              <h2 id="method-title" class="section-heading">Trace-driven improvement, made explicit.</h2>
-            </div>
-            <p class="lead">
-              Harness configurations behave like states, typed edits like actions, and verifier
-              scores like feedback. Deterministic gates decide what ships.
-            </p>
-          </div>
-
-          <div class="method-steps">
-            <article class="method-step">
-              <span class="step-index">1</span>
-              <h3>Compose</h3>
-              <p>Make prompts, tools, memory, control, and observability first-class dimensions.</p>
-            </article>
-            <article class="method-step">
-              <span class="step-index">2</span>
-              <h3>Adapt</h3>
-              <p>Digest trajectories, plan a bounded edit, generate candidates, then critique them.</p>
-            </article>
-            <article class="method-step">
-              <span class="step-index">3</span>
-              <h3>Evolve</h3>
-              <p>Feed accepted trajectories into model training and continue the search loop.</p>
-            </article>
-          </div>
-
-          <div class="visual-frame method-figure">
+      <div class="overview-figure">
+        <figure class="paper-figure container">
+          <a href="assets/paper/site/overview.webp" aria-label="Open the HarnessX overview figure">
             <img
-              src="assets/paper/Harness_Evolution.png"
-              alt="AEGIS evolution loop with digester, planner, evolver, critic, and gate"
-              width="2736"
-              height="1122"
-              loading="lazy"
-              decoding="async"
+              src="assets/paper/site/overview.webp"
+              alt="HarnessX composes agent behavior, adapts the harness from agent runs, and evolves the model from improved trajectories"
+              width="2353"
+              height="1125"
+              fetchpriority="high"
+              decoding="sync"
             />
+          </a>
+          <figcaption>HarnessX unifies composition, adaptation, and evolution in one runtime loop.</figcaption>
+        </figure>
+      </div>
+
+      <section id="overview" class="content-section" aria-labelledby="overview-title">
+        <div class="container">
+          <div class="reading-width">
+            <p class="section-kicker">Overview</p>
+            <h2 id="overview-title">Treat the harness as a first-class interface.</h2>
+            <p class="section-lead">
+              HarnessX separates a model from the runtime behavior around it. Prompts, tools,
+              memory, control flow, evaluation, and training export become composable primitives
+              that can improve from execution feedback.
+            </p>
+          </div>
+
+          <div class="capabilities">
+            <article class="capability">
+              <span class="capability-index">01</span>
+              <h3>Compose</h3>
+              <p>Swap behavior across nine orthogonal dimensions without rewriting the agent.</p>
+            </article>
+            <article class="capability">
+              <span class="capability-index">02</span>
+              <h3>Adapt</h3>
+              <p>Turn traces into bounded harness edits, then test and gate every candidate.</p>
+            </article>
+            <article class="capability">
+              <span class="capability-index">03</span>
+              <h3>Evolve</h3>
+              <p>Convert reward-annotated trajectories into training signal for a better model.</p>
+            </article>
           </div>
         </div>
       </section>
 
-      <section id="results" class="results" aria-labelledby="results-title">
+      <section id="aegis" class="content-section soft-band" aria-labelledby="aegis-title">
         <div class="container">
-          <div class="section-intro">
-            <div>
-              <p class="section-label">Results</p>
-              <h2 id="results-title" class="section-heading">Better scaffolding, measurable gains.</h2>
-            </div>
-            <p class="lead">
-              Across GAIA, ALFWorld, WebShop, tau<sup>3</sup>-Bench, and SWE-bench Verified,
-              harness evolution improves 14 of 15 evaluated configurations.
+          <div class="reading-width">
+            <p class="section-kicker">AEGIS</p>
+            <h2 id="aegis-title">The harness learns from its own traces.</h2>
+            <p class="section-lead">
+              AEGIS digests execution history, plans a targeted change, generates a candidate, and
+              critiques the result. Only verified improvements become the next harness.
+            </p>
+          </div>
+          <figure class="paper-figure section-figure">
+            <a href="assets/paper/site/aegis.webp" aria-label="Open the AEGIS workflow figure">
+              <img
+                src="assets/paper/site/aegis.webp"
+                alt="AEGIS workflow from HarnessX composition and runtime traces through Digester, Planner, Evolver, and Critic"
+                width="1670"
+                height="662"
+                decoding="sync"
+              />
+            </a>
+            <figcaption>AEGIS evolves typed harness configurations with an explicit ship-or-reject gate.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section id="results" class="content-section" aria-labelledby="results-title">
+        <div class="container">
+          <div class="reading-width">
+            <p class="section-kicker">Results</p>
+            <h2 id="results-title">Harness evolution improves 14 of 15 configurations.</h2>
+            <p class="section-lead">
+              The evaluation spans GAIA, ALFWorld, WebShop, tau<sup>3</sup>-Bench, and SWE-bench
+              Verified across three model families. The largest gains appear where the initial
+              model has the most behavioral gaps.
             </p>
           </div>
 
-          <div class="result-highlights" aria-label="Key results">
-            <div class="result-highlight">
+          <div class="metrics" aria-label="Key evaluation results">
+            <div class="metric">
+              <strong>+14.5%</strong>
+              <span>average absolute gain across all 15 configurations</span>
+            </div>
+            <div class="metric">
               <strong>+44.0%</strong>
-              <span>largest gain, ALFWorld / Qwen3.5-9B</span>
+              <span>largest gain, on ALFWorld with Qwen3.5-9B</span>
             </div>
-            <div class="result-highlight">
-              <strong>97.8</strong>
-              <span>best evolved score, ALFWorld / GPT-5.4</span>
-            </div>
-            <div class="result-highlight">
-              <strong>+18.2%</strong>
-              <span>SWE-bench gain for GPT-5.4 and Qwen3.5-9B</span>
-            </div>
-            <div class="result-highlight">
-              <strong>+4.7%</strong>
-              <span>co-evolution lift beyond harness-only search</span>
+            <div class="metric">
+              <strong>14 / 15</strong>
+              <span>model-benchmark configurations improved</span>
             </div>
           </div>
 
-          <div class="table-wrap" role="region" aria-label="Representative harness evolution results" tabindex="0">
-            <table>
-              <thead>
-                <tr>
-                  <th>Benchmark / agent</th>
-                  <th>Initial</th>
-                  <th>Evolved</th>
-                  <th>Gain</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>ALFWorld / Qwen3.5-9B</td>
-                  <td>53.0</td>
-                  <td>97.0</td>
-                  <td class="gain">+44.0</td>
-                </tr>
-                <tr>
-                  <td>WebShop / GPT-5.4</td>
-                  <td>55.0</td>
-                  <td>73.0</td>
-                  <td class="gain">+18.0</td>
-                </tr>
-                <tr>
-                  <td>GAIA / Claude Sonnet 4.6</td>
-                  <td>73.8</td>
-                  <td>83.5</td>
-                  <td class="gain">+9.7</td>
-                </tr>
-                <tr>
-                  <td>SWE-bench Verified / GPT-5.4</td>
-                  <td>45.5</td>
-                  <td>63.6</td>
-                  <td class="gain">+18.2</td>
-                </tr>
-                <tr>
-                  <td>tau<sup>3</sup>-Bench / GPT-5.4</td>
-                  <td>76.2</td>
-                  <td>90.7</td>
-                  <td class="gain">+14.5</td>
-                </tr>
-              </tbody>
-            </table>
+          <figure class="paper-figure section-figure">
+            <a href="assets/paper/site/evolution-results.webp" aria-label="Open the full harness evolution result figure">
+              <img
+                src="assets/paper/site/evolution-results.webp"
+                alt="GAIA-103 harness evolution trajectory with per-round pass@2, best-so-far, and annotated failure analysis"
+                width="2197"
+                height="1242"
+                decoding="sync"
+              />
+            </a>
+            <figcaption>GAIA-103 evolution trajectory with annotated failure patterns from the technical report.</figcaption>
+          </figure>
+
+          <div class="co-evolution">
+            <div class="co-evolution-copy">
+              <p class="section-kicker">Co-evolution</p>
+              <h3>Search and learning reinforce each other.</h3>
+              <p>
+                Interleaving cross-harness GRPO with AEGIS adds an average +4.7% over harness-only
+                evolution on GAIA and WebShop.
+              </p>
+            </div>
+            <figure class="paper-figure">
+              <a href="assets/paper/site/co-evolution-results.webp" aria-label="Open the co-evolution result figure">
+                <img
+                  src="assets/paper/site/co-evolution-results.webp"
+                  alt="AEGIS and model-harness co-evolution success rates on GAIA and WebShop"
+                  width="3190"
+                  height="1090"
+                  decoding="sync"
+                />
+              </a>
+              <figcaption>Co-evolution raises peak success on both evaluated benchmarks.</figcaption>
+            </figure>
           </div>
 
-          <details class="results-details">
-            <summary>Show all 15 configurations</summary>
-            <div class="table-wrap">
+          <details>
+            <summary>All 15 model-benchmark configurations</summary>
+            <div class="table-scroll" role="region" aria-label="Complete evaluation results" tabindex="0">
               <table>
                 <thead>
-                  <tr>
-                    <th>Benchmark</th>
-                    <th>Task agent</th>
-                    <th>Initial</th>
-                    <th>Evolved</th>
-                    <th>Gain</th>
-                  </tr>
+                  <tr><th>Benchmark</th><th>Task agent</th><th>Initial</th><th>Evolved</th><th>Gain</th></tr>
                 </thead>
                 <tbody>
                   <tr><td>ALFWorld</td><td>Claude Sonnet 4.6</td><td>83.6</td><td>94.8</td><td class="gain">+11.2</td></tr>
@@ -1124,73 +895,63 @@
               </table>
             </div>
           </details>
-
-          <div class="visual-frame result-figure">
-            <img
-              src="assets/paper/Evolution_Main.png"
-              alt="Harness evolution trajectories across five benchmarks"
-              width="3625"
-              height="2048"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
         </div>
       </section>
 
-      <section class="co-evolution" aria-labelledby="coevolution-title">
-        <div class="container co-grid">
-          <div class="visual-frame">
-            <img
-              src="assets/paper/coevolution_merged.png"
-              alt="Model-harness co-evolution compared with harness-only evolution"
-              width="3190"
-              height="1090"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-          <div class="co-copy">
-            <p class="section-label">Co-evolution</p>
-            <h2 id="coevolution-title" class="section-heading">Close the loop between search and learning.</h2>
-            <p>
-              Interleaving cross-harness GRPO with harness evolution adds an average +4.7% beyond
-              harness-only search on GAIA and WebShop with Qwen3.5-9B.
+      <section id="citation" class="citation soft-band" aria-labelledby="citation-title">
+        <div class="container citation-layout">
+          <div>
+            <p class="section-kicker">Citation</p>
+            <h2 id="citation-title">Read the full report.</h2>
+            <p class="section-lead">
+              The report contains the complete method, evaluation protocol, ablations, and failure
+              analysis.
             </p>
-          </div>
-        </div>
-      </section>
-
-      <section id="paper" class="paper" aria-labelledby="paper-title">
-        <div class="container paper-grid">
-          <div class="paper-copy">
-            <p class="section-label">Read and run</p>
-            <h2 id="paper-title" class="section-heading">Start with one harness config.</h2>
-            <p class="lead">
-              Read the technical report for the full evaluation, or open the repository for the
-              install script, examples, benchmarks, and the Python API.
-            </p>
-            <div class="paper-actions">
-              <a class="button primary" href="assets/paper/HarnessX_Tech_Report.pdf">Download report</a>
-              <a class="button" href="https://github.com/Darwin-Agent/HarnessX">Open repository</a>
+            <div class="actions" style="justify-content: flex-start">
+              <a class="button button-primary" href="assets/paper/HarnessX_Tech_Report.pdf">Open report</a>
+              <a class="button" href="https://github.com/Darwin-Agent/HarnessX">Repository</a>
             </div>
           </div>
-          <pre><code>from harnessx import BaseTask, HarnessConfig
-from harnessx.core.model_config import ModelConfig
-from harnessx.providers.anthropic_provider import AnthropicProvider
-
-model = ModelConfig(main=AnthropicProvider("claude-sonnet-4-6"))
-harness = model.agentic(HarnessConfig())
-result = await harness.run(BaseTask(description="What is 2 + 2?"))</code></pre>
+          <div class="citation-block">
+            <button id="copy-citation" class="copy-button" type="button">Copy BibTeX</button>
+            <pre><code id="bibtex">@techreport{darwinagent2026harnessx,
+  title  = {HarnessX: A Composable, Adaptive, and
+            Evolvable Agent Harness Foundry},
+  author = {Darwin Agent Team},
+  year   = {2026},
+  url    = {https://github.com/Darwin-Agent/HarnessX}
+}</code></pre>
+          </div>
         </div>
       </section>
     </main>
 
     <footer class="footer">
       <div class="container footer-inner">
-        <span>HarnessX / Darwin Agent Team</span>
+        <span>HarnessX &middot; Darwin Agent Team</span>
         <a href="https://github.com/Darwin-Agent/HarnessX">github.com/Darwin-Agent/HarnessX</a>
       </div>
     </footer>
+
+    <script>
+      const copyButton = document.querySelector("#copy-citation");
+      const bibtex = document.querySelector("#bibtex").textContent;
+
+      copyButton.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(bibtex);
+          copyButton.textContent = "Copied";
+          window.setTimeout(() => {
+            copyButton.textContent = "Copy BibTeX";
+          }, 1600);
+        } catch {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(document.querySelector("#bibtex"));
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      });
+    </script>
   </body>
 </html>
