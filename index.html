@@ -1617,7 +1617,7 @@
 
         const sectionIds = new Set(tocSections.map((section) => section.id));
         const activeFromScroll = () => {
-          const marker = window.scrollY + 140;
+          const marker = window.scrollY + 240;
           let activeSection = tocSections[0];
 
           tocSections.forEach((section) => {
@@ -1626,14 +1626,33 @@
             }
           });
 
+          if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 8) {
+            activeSection = tocSections[tocSections.length - 1];
+          }
+
           setActiveTocItem(activeSection.id);
+        };
+
+        let hashScrollLocked = false;
+        let hashScrollTimer = 0;
+
+        const lockActiveHash = () => {
+          hashScrollLocked = true;
+          window.clearTimeout(hashScrollTimer);
+          hashScrollTimer = window.setTimeout(() => {
+            hashScrollLocked = false;
+            activeFromScroll();
+          }, 2400);
         };
 
         const activeFromHash = () => {
           const hashSection = window.location.hash.slice(1);
           if (sectionIds.has(hashSection)) {
             setActiveTocItem(hashSection);
+            lockActiveHash();
           } else {
+            hashScrollLocked = false;
+            window.clearTimeout(hashScrollTimer);
             activeFromScroll();
           }
         };
@@ -1642,7 +1661,7 @@
         window.addEventListener(
           "scroll",
           () => {
-            if (!scrollFrame) {
+            if (!hashScrollLocked && !scrollFrame) {
               scrollFrame = window.requestAnimationFrame(() => {
                 activeFromScroll();
                 scrollFrame = 0;
@@ -1651,6 +1670,13 @@
           },
           { passive: true }
         );
+        window.addEventListener("scrollend", () => {
+          if (hashScrollLocked) {
+            hashScrollLocked = false;
+            window.clearTimeout(hashScrollTimer);
+            activeFromScroll();
+          }
+        });
         window.addEventListener("hashchange", activeFromHash);
         tocLinks.forEach((link) => {
           link.addEventListener("click", () => {
@@ -1659,6 +1685,7 @@
               target.open = true;
             }
             setActiveTocItem(link.dataset.tocTarget);
+            lockActiveHash();
           });
         });
         activeFromHash();
