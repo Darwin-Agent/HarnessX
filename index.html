@@ -265,6 +265,14 @@
 
       section.content-section {
         padding: 88px 0;
+        scroll-margin-top: 104px;
+      }
+
+      #composition,
+      #evaluation,
+      #co-evolution,
+      #failure-analysis {
+        scroll-margin-top: 104px;
       }
 
       .section-kicker {
@@ -722,6 +730,7 @@
 
       .citation {
         padding: 88px 0;
+        scroll-margin-top: 104px;
       }
 
       .citation-layout {
@@ -862,6 +871,18 @@
           border-color: var(--orange);
           background: var(--orange);
           transform: translateY(-50%) scale(1.25);
+        }
+
+        .page-toc a.toc-subitem {
+          padding-left: 8px;
+          color: #89909a;
+          font-size: 12px;
+          font-weight: 560;
+        }
+
+        .page-toc a.toc-subitem[aria-current="location"] {
+          color: var(--orange-dark);
+          font-weight: 740;
         }
       }
 
@@ -1163,8 +1184,12 @@
         <nav aria-label="Page sections">
           <a href="#intro" data-toc-target="intro">Introduction</a>
           <a href="#overview" data-toc-target="overview">Overview</a>
+          <a class="toc-subitem" href="#composition" data-toc-target="composition">Composition</a>
           <a href="#aegis" data-toc-target="aegis">AEGIS</a>
           <a href="#results" data-toc-target="results">Results</a>
+          <a class="toc-subitem" href="#evaluation" data-toc-target="evaluation">Evaluation setup</a>
+          <a class="toc-subitem" href="#co-evolution" data-toc-target="co-evolution">Co-evolution</a>
+          <a class="toc-subitem" href="#failure-analysis" data-toc-target="failure-analysis">Failure analysis</a>
           <a href="#citation" data-toc-target="citation">Citation</a>
         </nav>
       </aside>
@@ -1236,7 +1261,7 @@
             </article>
           </div>
 
-          <div class="composition-detail">
+          <div id="composition" class="composition-detail">
             <div>
               <p class="section-kicker">Representative edit surfaces</p>
               <h3>One harness, nine edit surfaces.</h3>
@@ -1345,7 +1370,7 @@
             </p>
           </div>
 
-          <div class="protocol" aria-label="Evaluation protocol">
+          <div id="evaluation" class="protocol" aria-label="Evaluation protocol">
             <div class="protocol-item">
               <strong>5 benchmarks</strong>
               <span>GAIA 103 (exact match), ALFWorld 134 (goal completion), WebShop 100 (attribute match), tau<sup>3</sup>-Bench 3 domains (rule compliance), SWE-bench Verified 55 (patch resolution)</span>
@@ -1437,7 +1462,7 @@
             <figcaption>GAIA-103 evolution trajectory with annotated failure patterns from the technical report.</figcaption>
           </figure>
 
-          <div class="co-evolution-method">
+          <div id="co-evolution" class="co-evolution-method">
             <div class="reading-width">
               <p class="section-kicker">Harness-model co-evolution</p>
               <h3 class="co-evolution-heading">The same trajectories update both sides.</h3>
@@ -1518,7 +1543,7 @@
             </div>
           </details>
 
-          <details class="failure-details">
+          <details id="failure-analysis" class="failure-details">
             <summary>What the trace analysis revealed</summary>
             <div class="failure-grid">
               <article class="failure-item">
@@ -1590,27 +1615,53 @@
           });
         };
 
-        const initialSection = window.location.hash.slice(1);
-        setActiveTocItem(
-          tocSections.some((section) => section.id === initialSection) ? initialSection : "intro"
+        const sectionIds = new Set(tocSections.map((section) => section.id));
+        const activeFromScroll = () => {
+          const marker = window.scrollY + 140;
+          let activeSection = tocSections[0];
+
+          tocSections.forEach((section) => {
+            if (section.getBoundingClientRect().top + window.scrollY <= marker) {
+              activeSection = section;
+            }
+          });
+
+          setActiveTocItem(activeSection.id);
+        };
+
+        const activeFromHash = () => {
+          const hashSection = window.location.hash.slice(1);
+          if (sectionIds.has(hashSection)) {
+            setActiveTocItem(hashSection);
+          } else {
+            activeFromScroll();
+          }
+        };
+
+        let scrollFrame = 0;
+        window.addEventListener(
+          "scroll",
+          () => {
+            if (!scrollFrame) {
+              scrollFrame = window.requestAnimationFrame(() => {
+                activeFromScroll();
+                scrollFrame = 0;
+              });
+            }
+          },
+          { passive: true }
         );
-
-        if ("IntersectionObserver" in window) {
-          const tocObserver = new IntersectionObserver(
-            (entries) => {
-              const visibleSections = entries
-                .filter((entry) => entry.isIntersecting)
-                .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-
-              if (visibleSections.length) {
-                setActiveTocItem(visibleSections[0].target.id);
-              }
-            },
-            { rootMargin: "-110px 0px -64% 0px", threshold: [0, 0.1] }
-          );
-
-          tocSections.forEach((section) => tocObserver.observe(section));
-        }
+        window.addEventListener("hashchange", activeFromHash);
+        tocLinks.forEach((link) => {
+          link.addEventListener("click", () => {
+            const target = document.getElementById(link.dataset.tocTarget);
+            if (target && target.tagName === "DETAILS") {
+              target.open = true;
+            }
+            setActiveTocItem(link.dataset.tocTarget);
+          });
+        });
+        activeFromHash();
       }
 
       const copyButton = document.querySelector("#copy-citation");
