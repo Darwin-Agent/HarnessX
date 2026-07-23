@@ -320,8 +320,127 @@
         line-height: 1.65;
       }
 
+      .composition-detail {
+        display: grid;
+        grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+        gap: 56px;
+        margin-top: 72px;
+        border-top: 1px solid var(--line);
+        padding-top: 28px;
+      }
+
+      .composition-detail h3 {
+        font-size: 25px;
+        font-weight: 770;
+        line-height: 1.25;
+      }
+
+      .composition-detail p {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.68;
+      }
+
+      .dimension-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 26px 24px;
+      }
+
+      .dimension-group {
+        border-top: 2px solid var(--ink);
+        padding-top: 14px;
+      }
+
+      .dimension-group h4 {
+        margin: 0;
+        color: var(--orange-dark);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .dimension-group ul {
+        display: grid;
+        gap: 8px;
+        margin: 13px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .dimension-group li {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .dimension-group li strong {
+        color: var(--ink);
+        font-weight: 720;
+      }
+
+      .interface-note {
+        margin-top: 28px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 16px 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .interface-note strong {
+        color: var(--ink);
+      }
+
       .section-figure {
         margin-top: 48px;
+      }
+
+      .aegis-roles {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 24px;
+        margin-top: 48px;
+      }
+
+      .aegis-role {
+        border-top: 2px solid var(--ink);
+        padding-top: 16px;
+      }
+
+      .aegis-role h3 {
+        font-size: 18px;
+        font-weight: 760;
+        line-height: 1.25;
+      }
+
+      .aegis-role p {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .aegis-gate {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        gap: 34px;
+        margin-top: 42px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 20px 0;
+      }
+
+      .aegis-gate p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .aegis-gate strong {
+        color: var(--ink);
       }
 
       .soft-band {
@@ -364,6 +483,145 @@
         line-height: 1.5;
       }
 
+      .protocol {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0;
+        margin-top: 44px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .protocol-item {
+        min-height: 108px;
+        padding: 18px 20px 18px 0;
+      }
+
+      .protocol-item + .protocol-item {
+        border-left: 1px solid var(--line);
+        padding-left: 20px;
+      }
+
+      .protocol-item strong {
+        display: block;
+        font-size: 14px;
+        font-weight: 760;
+      }
+
+      .protocol-item span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .results-table {
+        margin-top: 52px;
+      }
+
+      .table-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+      }
+
+      .table-heading h3 {
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      .table-heading p {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .results-table .table-scroll {
+        margin-top: 12px;
+      }
+
+      .representative-table {
+        display: block;
+      }
+
+      .run-highlights {
+        display: none;
+      }
+
+      .run-highlight {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        border-top: 1px solid var(--line);
+        padding: 14px 0;
+        font-size: 14px;
+      }
+
+      .run-highlight > span:first-child {
+        display: grid;
+        gap: 3px;
+      }
+
+      .run-highlight small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .run-score {
+        white-space: nowrap;
+        color: var(--muted);
+      }
+
+      .run-score b {
+        margin-left: 8px;
+        color: var(--green);
+        font-weight: 780;
+      }
+
+      .variant-note {
+        margin-top: 34px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 17px 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .variant-note strong {
+        color: var(--ink);
+      }
+
+      .co-evolution-method {
+        margin-top: 72px;
+      }
+
+      .co-evolution-method .section-lead {
+        max-width: 760px;
+      }
+
+      .co-evolution-heading {
+        margin-top: 0;
+        font-size: 28px;
+        font-weight: 770;
+        line-height: 1.25;
+      }
+
+      .co-evolution-method .paper-figure {
+        margin-top: 38px;
+      }
+
+      .co-evolution-note {
+        margin-top: 15px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
       .co-evolution {
         display: grid;
         grid-template-columns: minmax(0, 0.88fr) minmax(0, 2.12fr);
@@ -387,6 +645,30 @@
 
       .co-evolution .paper-figure {
         padding: 22px 0;
+      }
+
+      .failure-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+        padding: 0 0 20px;
+      }
+
+      .failure-item {
+        border-top: 1px solid var(--line);
+        padding-top: 15px;
+      }
+
+      .failure-item h3 {
+        font-size: 16px;
+        font-weight: 750;
+      }
+
+      .failure-item p {
+        margin-top: 9px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
       }
 
       details {
@@ -532,6 +814,19 @@
           gap: 24px;
         }
 
+        .composition-detail {
+          grid-template-columns: 1fr;
+          gap: 32px;
+        }
+
+        .aegis-roles {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .aegis-gate {
+          grid-template-columns: 1fr;
+        }
+
         .metric {
           padding-inline: 20px;
         }
@@ -637,6 +932,16 @@
           line-height: 1.68;
         }
 
+        .composition-detail {
+          gap: 28px;
+          margin-top: 52px;
+        }
+
+        .dimension-grid {
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+
         .capabilities {
           grid-template-columns: 1fr;
           gap: 30px;
@@ -649,6 +954,62 @@
 
         .section-figure {
           margin-top: 36px;
+        }
+
+        .aegis-roles {
+          grid-template-columns: 1fr;
+          gap: 26px;
+          margin-top: 36px;
+        }
+
+        .aegis-gate {
+          gap: 14px;
+          margin-top: 34px;
+        }
+
+        .protocol {
+          grid-template-columns: 1fr;
+          margin-top: 34px;
+        }
+
+        .protocol-item {
+          min-height: 0;
+          padding: 17px 2px;
+        }
+
+        .protocol-item + .protocol-item {
+          border-top: 1px solid var(--line);
+          border-left: 0;
+          padding-left: 2px;
+        }
+
+        .results-table {
+          margin-top: 38px;
+        }
+
+        .representative-table {
+          display: none;
+        }
+
+        .run-highlights {
+          display: grid;
+          margin-top: 12px;
+        }
+
+        .table-heading {
+          display: block;
+        }
+
+        .table-heading p {
+          margin-top: 7px;
+        }
+
+        .co-evolution-method {
+          margin-top: 54px;
+        }
+
+        .co-evolution-method .paper-figure {
+          margin-top: 28px;
         }
 
         .metrics {
@@ -676,6 +1037,11 @@
 
         .co-evolution h3 {
           font-size: 24px;
+        }
+
+        .failure-grid {
+          grid-template-columns: 1fr;
+          gap: 24px;
         }
 
         .footer-inner {
@@ -754,9 +1120,11 @@
             <p class="section-kicker">Overview</p>
             <h2 id="overview-title">Treat the harness as a first-class interface.</h2>
             <p class="section-lead">
-              HarnessX separates a model from the runtime behavior around it. Prompts, tools,
-              memory, control flow, evaluation, and training export become composable primitives
-              that can improve from execution feedback.
+              An agent is more than a model call. Its harness decides how a task is represented,
+              what context and memory persist between steps, which tools can be invoked, where
+              side effects occur, how outcomes are scored, and which traces are retained. HarnessX
+              makes this runtime interface a typed object that can be composed, audited, and
+              improved from execution feedback.
             </p>
           </div>
 
@@ -777,6 +1145,49 @@
               <p>Convert reward-annotated trajectories into training signal for a better model.</p>
             </article>
           </div>
+
+          <div class="composition-detail">
+            <div>
+              <p class="section-kicker">Representative edit surfaces</p>
+              <h3>One harness, nine edit surfaces.</h3>
+              <p>
+                An agent is represented as <strong>H = (M, C)</strong>: model configuration M
+                chooses role and fallback models, while C owns the behavior pipeline and shared
+                runtime slots. Processors attach to lifecycle hooks, so a single behavior can be
+                inserted, replaced, or removed without rebuilding the agent.
+              </p>
+              <p class="interface-note">
+                <strong>Typed interface:</strong> eight lifecycle hooks, same event type in and
+                out, deterministic ordering, singleton groups, and serializable configurations.
+              </p>
+            </div>
+            <div class="dimension-grid" aria-label="HarnessX nine behavioral dimensions">
+              <div class="dimension-group">
+                <h4>Compose</h4>
+                <ul>
+                  <li><strong>D1</strong> Model selection</li>
+                  <li><strong>D2</strong> Context assembly</li>
+                  <li><strong>D3</strong> Memory management</li>
+                  <li><strong>D4</strong> Tool ecosystem</li>
+                  <li><strong>D5</strong> Execution environment</li>
+                </ul>
+              </div>
+              <div class="dimension-group">
+                <h4>Adapt</h4>
+                <ul>
+                  <li><strong>D6</strong> Evaluation and reward</li>
+                  <li><strong>D7</strong> Control and safety</li>
+                </ul>
+              </div>
+              <div class="dimension-group">
+                <h4>Evolve</h4>
+                <ul>
+                  <li><strong>D8</strong> Observability</li>
+                  <li><strong>D9</strong> Training bridge</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -786,8 +1197,10 @@
             <p class="section-kicker">AEGIS</p>
             <h2 id="aegis-title">The harness learns from its own traces.</h2>
             <p class="section-lead">
-              AEGIS digests execution history, plans a targeted change, generates a candidate, and
-              critiques the result. Only verified improvements become the next harness.
+              AEGIS treats harness adaptation as reinforcement learning in symbolic space: the
+              current harness and trace store form the state, a typed code-level edit is the action,
+              and execution traces plus verifier scores provide feedback. One meta-agent selectively
+              invokes four stages; only verified improvements become the next harness.
             </p>
           </div>
           <figure class="paper-figure section-figure">
@@ -802,6 +1215,30 @@
             </a>
             <figcaption>AEGIS evolves typed harness configurations with an explicit ship-or-reject gate.</figcaption>
           </figure>
+
+          <div class="aegis-roles" aria-label="AEGIS stages">
+            <article class="aegis-role">
+              <h3>Digester</h3>
+              <p>Compresses roughly 10M raw trace tokens from one GAIA pass@2 iteration &rarr; ~10K structured summaries with cross-round history.</p>
+            </article>
+            <article class="aegis-role">
+              <h3>Planner</h3>
+              <p>Builds an adaptation landscape covering failed tasks, implicated components, and untried prompt, tool, processor, or config edits.</p>
+            </article>
+            <article class="aegis-role">
+              <h3>Evolver</h3>
+              <p>Emits typed builder candidates with a change manifest; new processor code also carries a smoke test.</p>
+            </article>
+            <article class="aegis-role">
+              <h3>Critic + gate</h3>
+              <p>Checks evidence and non-local risks, then verifies normalization, build checks, and regressions before shipping.</p>
+            </article>
+          </div>
+
+          <div class="aegis-gate">
+            <p><strong>Every round:</strong> run the current harness, retain complete traces, test candidates on the same adaptation batch, and archive rejected edits with a reason.</p>
+            <p><strong>Seesaw constraint:</strong> a candidate cannot regress a previously solved task. When tasks conflict, variant isolation can route them to separate harness versions instead of discarding a useful local fix.</p>
+          </div>
         </div>
       </section>
 
@@ -813,8 +1250,28 @@
             <p class="section-lead">
               The evaluation spans GAIA, ALFWorld, WebShop, tau<sup>3</sup>-Bench, and SWE-bench
               Verified across three model families. The largest gains appear where the initial
-              model has the most behavioral gaps.
+              model has the most behavioral gaps; reported peak scores use the same task sets used
+              for evolution.
             </p>
+          </div>
+
+          <div class="protocol" aria-label="Evaluation protocol">
+            <div class="protocol-item">
+              <strong>5 benchmarks</strong>
+              <span>GAIA 103 (exact match), ALFWorld 134 (goal completion), WebShop 100 (attribute match), tau<sup>3</sup>-Bench 3 domains (rule compliance), SWE-bench Verified 55 (patch resolution)</span>
+            </div>
+            <div class="protocol-item">
+              <strong>3 task agents</strong>
+              <span>Claude Sonnet 4.6, GPT-5.4, and Qwen3.5-9B; Opus 4.6 runs the meta-agent</span>
+            </div>
+            <div class="protocol-item">
+              <strong>Up to 15 rounds</strong>
+              <span>Full task set evaluated each round, with early stop after three idle rounds</span>
+            </div>
+            <div class="protocol-item">
+              <strong>Pass@2</strong>
+              <span>Two independent attempts; either success counts. No held-out generalization is reported.</span>
+            </div>
           </div>
 
           <div class="metrics" aria-label="Key evaluation results">
@@ -832,6 +1289,51 @@
             </div>
           </div>
 
+          <div class="results-table">
+            <div class="table-heading">
+              <h3>Representative runs</h3>
+              <p>Peak pass@2, percentage points</p>
+            </div>
+            <div class="table-scroll representative-table" role="region" aria-label="Representative evaluation results" tabindex="0">
+              <table>
+                <thead>
+                  <tr><th>Benchmark</th><th>Task agent</th><th>Initial</th><th>Peak</th><th>Gain</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>ALFWorld</td><td>Qwen3.5-9B</td><td>53.0</td><td>97.0</td><td class="gain">+44.0</td></tr>
+                  <tr><td>GAIA</td><td>Qwen3.5-9B</td><td>20.3</td><td>37.4</td><td class="gain">+17.1</td></tr>
+                  <tr><td>WebShop</td><td>GPT-5.4</td><td>55.0</td><td>73.0</td><td class="gain">+18.0</td></tr>
+                  <tr><td>SWE-bench Verified</td><td>GPT-5.4</td><td>45.5</td><td>63.6</td><td class="gain">+18.2</td></tr>
+                  <tr><td>tau<sup>3</sup>-Bench</td><td>GPT-5.4</td><td>76.2</td><td>90.7</td><td class="gain">+14.5</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="run-highlights" aria-label="Representative evaluation results on mobile">
+              <div class="run-highlight">
+                <span><strong>ALFWorld</strong><small>Qwen3.5-9B</small></span>
+                <span class="run-score">53.0 &rarr; 97.0 <b>+44.0</b></span>
+              </div>
+              <div class="run-highlight">
+                <span><strong>GAIA</strong><small>Qwen3.5-9B</small></span>
+                <span class="run-score">20.3 &rarr; 37.4 <b>+17.1</b></span>
+              </div>
+              <div class="run-highlight">
+                <span><strong>WebShop</strong><small>GPT-5.4</small></span>
+                <span class="run-score">55.0 &rarr; 73.0 <b>+18.0</b></span>
+              </div>
+              <div class="run-highlight">
+                <span><strong>SWE-bench Verified</strong><small>GPT-5.4</small></span>
+                <span class="run-score">45.5 &rarr; 63.6 <b>+18.2</b></span>
+              </div>
+              <div class="run-highlight">
+                <span><strong>tau<sup>3</sup>-Bench</strong><small>GPT-5.4</small></span>
+                <span class="run-score">76.2 &rarr; 90.7 <b>+14.5</b></span>
+              </div>
+            </div>
+          </div>
+
+          <p class="variant-note"><strong>Heterogeneous tasks:</strong> GAIA with GPT-5.4 stagnates under one global harness (73.8% peak, 49.5% final). Variant isolation reaches 87.4% with peak = final, +13.6 points over the static baseline, while using 107.8M vs 143.7M tokens.</p>
+
           <figure class="paper-figure section-figure">
             <a href="assets/paper/site/evolution-results.webp" aria-label="Open the full harness evolution result figure">
               <img
@@ -845,14 +1347,44 @@
             <figcaption>GAIA-103 evolution trajectory with annotated failure patterns from the technical report.</figcaption>
           </figure>
 
+          <div class="co-evolution-method">
+            <div class="reading-width">
+              <p class="section-kicker">Harness-model co-evolution</p>
+              <h3 class="co-evolution-heading">The same trajectories update both sides.</h3>
+              <p class="section-lead">
+                Each iteration rolls out the pair (M<sub>t</sub>, H<sub>t</sub>), scores traces with a
+                fixed verifier, and appends them with their harness version to a FIFO replay buffer.
+                AEGIS makes the discrete harness edit; cross-harness GRPO groups trajectories by
+                task across harness versions and learns from their relative rewards. The next round
+                starts with (M<sub>t+1</sub>, H<sub>t+1</sub>) without extra environment rollouts for
+                the model update.
+              </p>
+            </div>
+            <figure class="paper-figure">
+              <a href="assets/paper/site/co-evolution.webp" aria-label="Open the HarnessX co-evolution workflow figure">
+                <img
+                  src="assets/paper/site/co-evolution.webp"
+                  alt="HarnessX co-evolution workflow: shared task traces feed AEGIS harness evolution and cross-harness GRPO model updates"
+                  width="3076"
+                  height="1579"
+                  decoding="sync"
+                />
+              </a>
+              <figcaption>One replay buffer supplies evidence for harness search and training signal for the model.</figcaption>
+            </figure>
+          </div>
+
           <div class="co-evolution">
             <div class="co-evolution-copy">
-              <p class="section-kicker">Co-evolution</p>
+              <p class="section-kicker">Measured gain</p>
               <h3>Search and learning reinforce each other.</h3>
               <p>
-                Interleaving cross-harness GRPO with AEGIS adds an average +4.7% over harness-only
-                evolution on GAIA and WebShop.
+                On GAIA (103 tasks) and WebShop (100 tasks) with Qwen3.5-9B, a four-round FIFO
+                window lets both updates learn from the same recent trajectories. Interleaving
+                cross-harness GRPO with AEGIS raises peak success by +4.7% on average over
+                harness-only evolution.
               </p>
+              <p class="co-evolution-note">GAIA: 37.4% to 41.7% (+4.3%). WebShop: 49.0% to 54.0% (+5.0%). The gap remains at the final round.</p>
             </div>
             <figure class="paper-figure">
               <a href="assets/paper/site/co-evolution-results.webp" aria-label="Open the co-evolution result figure">
@@ -869,11 +1401,11 @@
           </div>
 
           <details>
-            <summary>All 15 model-benchmark configurations</summary>
+            <summary>All 15 model-benchmark configurations (peak pass@2)</summary>
             <div class="table-scroll" role="region" aria-label="Complete evaluation results" tabindex="0">
               <table>
                 <thead>
-                  <tr><th>Benchmark</th><th>Task agent</th><th>Initial</th><th>Evolved</th><th>Gain</th></tr>
+                  <tr><th>Benchmark</th><th>Task agent</th><th>Initial</th><th>Peak</th><th>Gain</th></tr>
                 </thead>
                 <tbody>
                   <tr><td>ALFWorld</td><td>Claude Sonnet 4.6</td><td>83.6</td><td>94.8</td><td class="gain">+11.2</td></tr>
@@ -893,6 +1425,24 @@
                   <tr><td>tau<sup>3</sup>-Bench</td><td>Qwen3.5-9B</td><td>93.5</td><td>94.6</td><td class="gain">+1.1</td></tr>
                 </tbody>
               </table>
+            </div>
+          </details>
+
+          <details class="failure-details">
+            <summary>What the trace analysis revealed</summary>
+            <div class="failure-grid">
+              <article class="failure-item">
+                <h3>Reward hacking</h3>
+                <p>GAIA/Sonnet rose 74.8% to 79.6% through verifier-format regularities; trace analysis led to a cross-check guard two rounds later.</p>
+              </article>
+              <article class="failure-item">
+                <h3>Catastrophic forgetting</h3>
+                <p>A sixth same-type reminder on tau<sup>3</sup>-Bench Telecom drove compliance from 94.7% to 80.7% at R7, then recovered by R9.</p>
+              </article>
+              <article class="failure-item">
+                <h3>Under-exploration</h3>
+                <p>On ALFWorld/Sonnet, prompt edits yielded less than 1% per round from R4-R7 while ship-prediction accuracy fell from 80% to 0%.</p>
+              </article>
             </div>
           </details>
         </div>
