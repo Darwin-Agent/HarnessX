@@ -424,12 +424,27 @@ class StatefulTrajectory:
 
         if config is not None:
             proc_parts: list[str] = []
-            for _hook, procs in (getattr(config, "processors", None) or {}).items():
-                for p in procs:
+            raw_procs = getattr(config, "processors", None)
+            proc_iter: list = []
+            if isinstance(raw_procs, dict):
+                # Legacy / duck-typed shape: hook -> list[Processor]
+                for _hook, procs in raw_procs.items():
+                    proc_iter.extend(procs)
+            elif isinstance(raw_procs, list):
+                # Current shape on HarnessConfig: list[dict] of _target_ entries.
+                proc_iter.extend(raw_procs)
+            # Runtime-only processors (e.g. MCP hot-reload) live on _rt_procs.
+            proc_iter.extend(getattr(config, "_rt_procs", None) or [])
+            for p in proc_iter:
+                if isinstance(p, dict):
+                    target = p.get("_target_") or ""
+                    label = target.rsplit(".", 1)[-1] if target else "?"
+                    order = p.get("_order", "?")
+                else:
                     group = getattr(p, "_singleton_group", "") or ""
                     order = getattr(p, "_order", "?")
                     label = group or type(p).__name__
-                    proc_parts.append(f"{label}({order})")
+                proc_parts.append(f"{label}({order})")
             registry = getattr(config, "tool_registry", None)
             tool_names: list[str] = []
             if registry is not None and hasattr(registry, "list_names"):

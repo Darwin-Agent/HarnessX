@@ -219,6 +219,46 @@ class TestFullLevel:
         assert "mygroup(50)" in md
         assert "Tools: [Bash, Read]" in md
 
+    def test_full_with_list_form_processors(self):
+        # HarnessConfig.processors is list[dict] after __post_init__; each dict
+        # carries a _target_ (fully-qualified class path) and optional _order.
+        config = SimpleNamespace(
+            processors=[
+                {"_target_": "pkg.mod.MyProcessor", "_order": 10, "_hook_": "*"},
+                {"_target_": "pkg.mod.OtherProcessor"},
+            ],
+            tool_registry=None,
+        )
+        md = _traj(_make_step(1)).to_markdown(level="full", config=config)
+        assert "## Harness Config" in md
+        assert "MyProcessor(10)" in md
+        assert "OtherProcessor(?)" in md
+
+    def test_full_with_real_harness_config_does_not_crash(self):
+        # Regression: HarnessConfig.processors is list[dict], not dict; the old
+        # implementation called .items() on it and raised AttributeError.
+        from harnessx.core.builder import HarnessBuilder
+        from harnessx.bundles import context
+
+        cfg = (HarnessBuilder() | context).build()
+        md = _traj(_make_step(1)).to_markdown(level="full", config=cfg)
+        assert "## Harness Config" in md
+        # System prompt processor is the first entry of the context bundle.
+        assert "SystemPromptProcessor" in md
+
+    def test_full_with_config_includes_runtime_only_processors(self):
+        class _RtProc:
+            _singleton_group = "runtime.only"
+            _order = 99
+
+        config = SimpleNamespace(
+            processors=[],
+            _rt_procs=[_RtProc()],
+            tool_registry=None,
+        )
+        md = _traj(_make_step(1)).to_markdown(level="full", config=config)
+        assert "runtime.only(99)" in md
+
     def test_full_diagnostics_top_tools_sorted(self):
         traj = _traj(
             _make_step(
