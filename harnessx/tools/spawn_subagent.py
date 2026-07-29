@@ -29,6 +29,11 @@ SPAWN_TOOL_NAME = "spawn_subagent"
 
 _MAX_SPAWN_DEPTH = 3
 
+# Strong refs to fire-and-forget async subagent tasks.  asyncio only holds
+# weak references to tasks, so without this set a background subagent could
+# be garbage-collected before completing and silently drop its result.
+_BACKGROUND_TASKS: "set[asyncio.Task]" = set()
+
 
 # ---------------------------------------------------------------------------
 # Module-level tool function — reads parent configs from RunLoop context
@@ -224,7 +229,9 @@ async def spawn_subagent(
                 )
                 parent_state.pending_subagents.pop(effective_label, None)
 
-    asyncio.create_task(_run_child())
+    _bg_task = asyncio.create_task(_run_child(), name=f"spawn_subagent:{effective_label}")
+    _BACKGROUND_TASKS.add(_bg_task)
+    _bg_task.add_done_callback(_BACKGROUND_TASKS.discard)
     return json.dumps({"status": "accepted", "label": effective_label})
 
 

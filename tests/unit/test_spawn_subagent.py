@@ -222,6 +222,73 @@ class TestSpawnSubagent:
         user_msgs = [m for m in parent_state.messages if m.role == "user"]
         assert any("async result" in m.content for m in user_msgs)
 
+    @pytest.mark.asyncio
+    async def test_spawn_async_task_is_referenced_until_done(self, monkeypatch):
+        """Fire-and-forget subagent tasks must be strong-referenced so the
+        event loop cannot garbage-collect them before completion.
+
+        Regression: asyncio only holds weak refs to tasks. Without a module-level
+        strong ref, the returned Task from asyncio.create_task() could be
+        collected between the tool return and the await point in the child
+        harness, silently dropping the subagent's result.
+        """
+        import gc
+        from harnessx.core.harness import HarnessConfig
+        from harnessx.core.state import State
+        from harnessx.tools.inmemory import InMemoryToolRegistry
+        from harnessx.tools.spawn_subagent import _BACKGROUND_TASKS
+
+        model_config = ModelConfig(main=MagicMock())
+        config = HarnessConfig(tool_registry=InMemoryToolRegistry())
+
+        child_started = asyncio.Event()
+        release_child = asyncio.Event()
+
+        class _FakeResult:
+            final_output = "held result"
+            run_id = "held-run"
+
+        async def _fake_run(self, subtask, parent_run_id=None, run_id=None):
+            child_started.set()
+            await release_child.wait()
+            return _FakeResult()
+
+        import harnessx.core.harness as harness_mod
+
+        monkeypatch.setattr(harness_mod.Harness, "run", _fake_run)
+
+        parent_state = State(run_id="parent-ref")
+        token = _spawn_ctx.set(
+            {
+                "run_id": "parent-ref",
+                "step_id": 0,
+                "spawn_depth": 0,
+                "state": parent_state,
+                "tracer": None,
+                "model_config": model_config,
+                "harness_config": config,
+            }
+        )
+        try:
+            await spawn_subagent(task="held work", wait=False, label="held")
+        finally:
+            _spawn_ctx.reset(token)
+
+        # Task must be registered while still running.
+        await child_started.wait()
+        held_tasks = [t for t in _BACKGROUND_TASKS if t.get_name() == "spawn_subagent:held"]
+        assert len(held_tasks) == 1, "background task not tracked in _BACKGROUND_TASKS"
+        assert not held_tasks[0].done()
+
+        # Even after aggressive GC the task remains reachable via the strong-ref set.
+        gc.collect()
+        assert any(t.get_name() == "spawn_subagent:held" for t in _BACKGROUND_TASKS)
+
+        # Release the child and confirm the done-callback discards it.
+        release_child.set()
+        await held_tasks[0]
+        assert not any(t.get_name() == "spawn_subagent:held" for t in _BACKGROUND_TASKS)
+
     # ---------------------------------------------------------------------------
     # Tool schema
     # ---------------------------------------------------------------------------
