@@ -45,7 +45,7 @@ dependencies = [
     "playwright>=1.45",
     "html2text>=2024.0",
     # MCP server support
-    "mcp>=1.10,<2",
+    "mcp>=1.30,<2",
     # OpenTelemetry tracing
     "opentelemetry-sdk>=1.25",
     "opentelemetry-exporter-otlp>=1.25",
