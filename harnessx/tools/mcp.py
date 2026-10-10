@@ -195,11 +195,13 @@ class MCPClient:
         env: dict | None = None,
         audio_mode: str = "off",
         transcribe_fn: Any = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.transport = transport
         self.command = command.strip()
         self.url = url.rstrip("/")
         self.env = env  # extra environment variables for stdio subprocess
+        self.headers = dict(headers) if headers is not None else None
         self._audio_mode = audio_mode  # "off" | "auto" | "native"
         self._transcribe_fn = transcribe_fn  # async (path: str) -> str | None
         self._session: Any = None  # mcp.ClientSession
@@ -425,7 +427,8 @@ class MCPClient:
 
         if not self.url:
             raise MCPError("http MCP server requires a non-empty url")
-        read, write, _get_session_id = await stack.enter_async_context(streamablehttp_client(self.url))
+        kwargs = {"headers": self.headers} if self.headers is not None else {}
+        read, write, _get_session_id = await stack.enter_async_context(streamablehttp_client(self.url, **kwargs))
         return read, write
 
     def _require_connected(self) -> None:
@@ -464,6 +467,7 @@ class MCPToolRegistry(_DictRegistryMixin):
         supported_modalities: frozenset[str] | set[str] = frozenset(),
         audio_mode: str = "off",
         transcribe_fn: Any = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__()
         self.transport = transport
@@ -471,6 +475,7 @@ class MCPToolRegistry(_DictRegistryMixin):
         self.url = url
         self.name = name or command or url
         self.env = env  # extra env vars merged into the subprocess environment
+        self.headers = dict(headers) if headers is not None else None
         self.supported_modalities: frozenset[str] = frozenset(supported_modalities)
         self.audio_mode = audio_mode  # "off" | "auto" | "native"
         self.transcribe_fn = transcribe_fn  # async (path: str) -> str | None
@@ -488,6 +493,7 @@ class MCPToolRegistry(_DictRegistryMixin):
             env=self.env,
             audio_mode=self.audio_mode,
             transcribe_fn=self.transcribe_fn,
+            headers=self.headers,
         )
         await client.connect()
         self._client = client
