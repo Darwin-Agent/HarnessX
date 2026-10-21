@@ -23,7 +23,7 @@ Socket Mode 无需公网 IP，Slack 通过 WebSocket 主动推送事件。
 
 1. 进入应用 → **Settings** → **Socket Mode** → 开启 **Enable Socket Mode**
 2. 填写 Token Name（如 `gateway-token`）
-3. 点击 **Generate** → 复制生成的 **App-Level Token**（`xapp-` 开头）
+3. 点击 **Generate** → 复制生成的 **App-Level Token**
 
 ---
 
@@ -67,7 +67,7 @@ Socket Mode 无需公网 IP，Slack 通过 WebSocket 主动推送事件。
 ## 第五步：安装应用
 
 1. 进入应用 → **OAuth & Permissions** → **Install to Workspace** → 授权
-2. 安装完成后复制 **Bot User OAuth Token**（`xoxb-` 开头）
+2. 安装完成后从平台控制台复制 **Bot User OAuth Token**。
 
 ---
 
@@ -84,8 +84,8 @@ channels:
   slack:
     enabled: true
     channel_type: slack
-    bot_token: "xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx"
-    app_token: "xapp-1-xxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    bot_token: "<your-bot-token>"
+    app_token: "<your-app-token>"
     require_mention: true    # 频道中是否需要 @机器人
     reply_in_thread: true    # 是否在 Thread 中回复（推荐，保持频道整洁）
     reply_broadcast: false   # Thread 回复是否同时发到频道（广播）
@@ -97,8 +97,8 @@ channels:
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| `bot_token` | string | ✅ | — | Bot User OAuth Token（`xoxb-` 开头） |
-| `app_token` | string | ✅ | — | App-Level Token，Socket Mode 专用（`xapp-` 开头） |
+| `bot_token` | string | ✅ | — | Bot User OAuth Token |
+| `app_token` | string | ✅ | — | App-Level Token，Socket Mode 专用 |
 | `signing_secret` | string | | — | Signing Secret（Webhook 模式校验用，Socket Mode 不需要） |
 | `require_mention` | bool | | `true` | 频道中是否需要 @机器人 才触发（DM 始终响应） |
 | `reply_in_thread` | bool | | `true` | 是否在消息 Thread 中回复 |
@@ -146,7 +146,7 @@ Gateway 支持通过 `send_blocks()` 方法发送 Slack Block Kit 格式的富�
 
 ### Socket Mode 连接失败
 
-- 确认 `app_token` 是 App-Level Token（`xapp-` 开头），而非 Bot Token
+- 确认 `app_token` 是 App-Level Token，而非 Bot Token
 - 确认 Socket Mode 已在控制台启用
 - 查看日志：`hx-gateway logs -n 100 | grep slack`
 
@@ -177,8 +177,8 @@ channels:
   slack:
     enabled: true
     channel_type: slack
-    bot_token: "xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx"
-    app_token: "xapp-1-xxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    bot_token: "<your-bot-token>"
+    app_token: "<your-app-token>"
     require_mention: true
     reply_in_thread: true
     reply_broadcast: false

@@ -6,9 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/../.."
 
-# Internal .srv endpoints must NOT go through the WSL2→Windows proxy;
-# otherwise OpenAI/LiteLLM SDKs throw sporadic "Connection error." under load.
-# Unset is more reliable than NO_PROXY across uv-run / httpx / litellm edges.
+# Clear inherited proxy settings for predictable outbound connections.
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy
 export TAU2_DATA_DIR="${TAU2_DATA_DIR:-$HOME/tau2-bench/data}"
 

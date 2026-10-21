@@ -116,7 +116,7 @@ cd frontend && npm install && npm run build && cd ..
 ### CLI
 
 ```bash
-export ANTHROPIC_API_KEY=sk-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 
 hx "Research 2026 AI agent trends and write a structured report"
 hx -p "Write a Python fizzbuzz"     # non-interactive, print and exit
@@ -165,12 +165,12 @@ asyncio.run(main())
 <a id="benchmarks"></a>
 ## 📊 Benchmarks
 
-HarnessX provides two evolution loops that systematically improve agent performance on any benchmark:
+This project has two distinct Harness/model evolution workflows. Keep their implementations and results separate:
 
-- **Harness Evolution** — a meta-harness analyzes trajectories and automatically searches for better processor combinations, prompt strategies, and tool configurations, *without changing the model*.
-- **Model Evolution** — reward-annotated trajectories from harness runs feed RL fine-tuning (via [VERL](https://github.com/volcengine/verl)), improving the model itself.
+- **Legacy method — sequential evolution**: first evolve the Harness/config with GAIA, then optimize the model with GRPO. These are two consecutive stages.
+- **Integrated co-evolution**: HarnessX agent rollouts run inside veRL GRPO training; this is a separate workflow with a separate entry point.
 
-The two loops compose: evolve the harness first, then evolve the model on top. Below are results on the [GAIA](https://huggingface.co/datasets/gaia-benchmark/GAIA) benchmark. See [`benchmarks/README.md`](benchmarks/README.md) for additional benchmarks and adapter details.
+The results below belong to the legacy method and its Harness-evolution experiments; **they are not results for integrated co-evolution**. See the individual recipe guides for the available commands and dataset requirements. See [`benchmarks/README.md`](benchmarks/README.md) for additional benchmarks and adapter details.
 
 ### Harness Evolution (Qwen 3.5 9B)
 
@@ -188,13 +188,17 @@ The same approach scales to frontier models. Overall GAIA accuracy rises from 62
   <img src="docs/assets/Harness_Evolution.png" alt="Harness Evolution — Per-Domain Accuracy" width="700"/>
 </p>
 
-### Model-Harness Co-Evolution (Qwen 3.5 9B)
+### Old Method Result: Harness First, Then Model (Qwen 3.5 9B)
 
-When the two loops run together, the gains compound: harness evolution lifts the baseline from 33.97% to 41.67%; model evolution pushes it further to **55.77%** — a **+64% relative improvement**, all on a 9B model. → Reproduce: [`recipe/verl_harnessX/`](recipe/verl_harnessX/)
+In the legacy two-stage method, Harness evolution lifts the baseline from 33.97% to 41.67%; subsequent model optimization pushes it further to **55.77%** — a **+64% relative improvement**, all on a 9B model. This result belongs to the legacy method, not integrated co-evolution. → Reproduce it with [`recipe/gaia_evolver/`](recipe/gaia_evolver/) followed by [`recipe/verl_harnessX/`](recipe/verl_harnessX/).
 
 <p align="center">
   <img src="docs/assets/HarnessX_Model_Co_evolution.png" alt="Model-Harness Co-Evolution" width="700"/>
 </p>
+
+### Integrated Co-Evolution
+
+Run the separate integrated workflow with [`recipe/verl/launch/run_research_rl.sh`](recipe/verl/launch/run_research_rl.sh). It does not run the legacy GAIA harness-evolution stage. See [`docs/guide/evolution.md`](docs/guide/evolution.md) for setup and commands. The benchmark results above belong to the legacy method, not integrated co-evolution.
 
 ---
 

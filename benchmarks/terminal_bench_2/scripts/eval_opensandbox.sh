@@ -5,7 +5,7 @@
 # Required env vars:
 #   ANTHROPIC_API_KEY   — model API key
 #   ANTHROPIC_API_BASE  — model API base URL
-#   OPENSANDBOX_URL     — OpenSandbox server URL (e.g. http://10.0.0.1:13081)
+#   OPENSANDBOX_URL     — OpenSandbox server URL, supplied at runtime
 #
 # Optional env vars:
 #   MODEL                      — model ID passed to -m (default: claude-opus-4-6)

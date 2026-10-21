@@ -23,7 +23,7 @@ Socket Mode requires no public IP; Slack pushes events to your service via WebSo
 
 1. Go to the application → **Settings** → **Socket Mode** → enable **Enable Socket Mode**
 2. Enter a Token Name (e.g. `gateway-token`)
-3. Click **Generate** → copy the generated **App-Level Token** (starts with `xapp-`)
+3. Click **Generate** → copy the generated **App-Level Token**
 
 ---
 
@@ -67,7 +67,7 @@ Go to the application → **Event Subscriptions** → **Enable Events**:
 ## Step 5: Install the Application
 
 1. Go to the application → **OAuth & Permissions** → **Install to Workspace** → authorize
-2. After installation, copy the **Bot User OAuth Token** (starts with `xoxb-`)
+2. After installation, copy the **Bot User OAuth Token** from the provider console.
 
 ---
 
@@ -84,8 +84,8 @@ channels:
   slack:
     enabled: true
     channel_type: slack
-    bot_token: "xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx"
-    app_token: "xapp-1-xxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    bot_token: "<your-bot-token>"
+    app_token: "<your-app-token>"
     require_mention: true    # Whether @mention is required in channels
     reply_in_thread: true    # Whether to reply in a Thread (recommended, keeps channels clean)
     reply_broadcast: false   # Whether Thread replies are also posted to the channel (broadcast)
@@ -97,8 +97,8 @@ channels:
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `bot_token` | string | ✅ | — | Bot User OAuth Token (starts with `xoxb-`) |
-| `app_token` | string | ✅ | — | App-Level Token, for Socket Mode only (starts with `xapp-`) |
+| `bot_token` | string | ✅ | — | Bot User OAuth Token |
+| `app_token` | string | ✅ | — | App-Level Token, for Socket Mode only |
 | `signing_secret` | string | | — | Signing Secret (for Webhook mode verification; not needed in Socket Mode) |
 | `require_mention` | bool | | `true` | Whether @mention is required in channels to trigger the bot (DMs always respond) |
 | `reply_in_thread` | bool | | `true` | Whether to reply in a message Thread |
@@ -146,7 +146,7 @@ When a long reply contains code blocks, Gateway automatically converts them to B
 
 ### Socket Mode connection fails
 
-- Confirm that `app_token` is an App-Level Token (starts with `xapp-`), not the Bot Token
+- Confirm that `app_token` is an App-Level Token, not the Bot Token
 - Confirm that Socket Mode has been enabled in the console
 - View logs: `hx-gateway logs -n 100 | grep slack`
 
@@ -177,8 +177,8 @@ channels:
   slack:
     enabled: true
     channel_type: slack
-    bot_token: "xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx"
-    app_token: "xapp-1-xxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    bot_token: "<your-bot-token>"
+    app_token: "<your-app-token>"
     require_mention: true
     reply_in_thread: true
     reply_broadcast: false

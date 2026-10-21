@@ -31,7 +31,7 @@ class DockerSandbox(Sandbox):
 
     Attributes:
         cdp_url: HTTP URL for Chromium CDP remote debugging
-                 (e.g. ``http://127.0.0.1:49321``).  ``None`` when
+                 (e.g. ``http://localhost:49321``).  ``None`` when
                  ``DockerSandboxProvider(enable_browser=False)`` (the default).
                  ``browser_tool`` reads this attribute to decide whether to
                  connect via CDP or launch a local Playwright instance.
@@ -231,17 +231,17 @@ class DockerSandboxProvider(SandboxProvider):
         name = f"oh-agent-{hint_id}" if hint_id else None
 
         # When browser is enabled start chromium alongside the sleep sentinel.
-        # --remote-debugging-address=0.0.0.0 allows Docker port mapping to reach
+        # --remote-debugging-address=localhost allows Docker port mapping to reach
         # it from the host; port 0 on the host lets Docker pick a free port.
         if self.enable_browser:
             command = (
                 "sh -c 'chromium --headless --no-sandbox "
                 f"--remote-debugging-port={_CDP_CONTAINER_PORT} "
-                "--remote-debugging-address=0.0.0.0 "
+                "--remote-debugging-address=localhost "
                 "--disable-gpu --disable-dev-shm-usage "
                 f"& sleep infinity'"
             )
-            ports = {f"{_CDP_CONTAINER_PORT}/tcp": ("127.0.0.1", 0)}
+            ports = {f"{_CDP_CONTAINER_PORT}/tcp": ("localhost", 0)}
         else:
             command = "sleep infinity"
             ports = {}
@@ -275,7 +275,7 @@ class DockerSandboxProvider(SandboxProvider):
             log.warning("CDP port %s not found in container port bindings", _CDP_CONTAINER_PORT)
             return None
         host_port = bindings[0]["HostPort"]
-        return f"http://127.0.0.1:{host_port}"
+        return f"http://localhost:{host_port}"
 
     # ── SandboxProvider interface ─────────────────────────────────────────────
 

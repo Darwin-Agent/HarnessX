@@ -60,10 +60,10 @@ uv sync  # or: pip install -e .
 ```bash
 # Option A: Anthropic proxy (supports extended thinking)
 export ANTHROPIC_BASE_URL=https://...
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 
 # Option B: LiteLLM / Azure OpenAI
-export OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY="<your-api-key>"
 ```
 
 ## Usage

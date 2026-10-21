@@ -108,7 +108,7 @@ hx-gateway stop
 
 # ── Gateway 服务器设置 ─────────────────────────────────────────────────────
 gateway:
-  host: "0.0.0.0"        # 监听地址（默认 0.0.0.0）
+  host: "<bind-host>"     # 监听地址，请按部署环境设置
   port: 8080             # 监听端口（默认 8080）
   agent_id: "gateway"    # 全局 agent_id，用于会话隔离
 
@@ -124,8 +124,8 @@ channels:
   feishu:
     enabled: true
     channel_type: feishu   # 可选，默认与 key 相同
-    app_id: "cli_xxxx"
-    app_secret: "xxxx"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
     mode: websocket        # websocket | webhook（见飞书文档）
     require_mention: true  # 群组中是否需要 @机器人
     reply_in_thread: false # 是否在话题内回复
@@ -133,28 +133,28 @@ channels:
   dingtalk:
     enabled: false
     channel_type: dingtalk
-    client_id: "dingxxxx"
-    client_secret: "xxxx"
+    client_id: "<your-client-id>"
+    client_secret: "<your-client-secret>"
     card_template_id: ""   # 可选：AI 流式卡片模板 ID
 
   telegram_bot:
     enabled: false
     channel_type: telegram
-    bot_token: "123456:ABC-DEF..."
+    bot_token: "<your-bot-token>"
     allowed_users:
-      - "123456789"        # Telegram user_id 白名单（空列表=所有人）
+      - "<your-user-id>"   # Telegram user ID 白名单（空列表=所有人）
 
   slack:
     enabled: false
     channel_type: slack
-    bot_token: "xoxb-..."
-    app_token: "xapp-..."  # Socket Mode 专用
+    bot_token: "<your-bot-token>"
+    app_token: "<your-app-token>"  # Socket Mode 专用
     reply_in_thread: true
 
   discord:
     enabled: false
     channel_type: discord
-    bot_token: "MTxxxx..."
+    bot_token: "<your-bot-token>"
 
 # ── 心跳任务（可选）─────────────────────────────────────────────────────
 heartbeat:
@@ -162,7 +162,7 @@ heartbeat:
   cron: "0 9 * * 1-5"    # 每工作日 9:00（UTC）
   prompt: "请总结今日待办事项"
   channel: feishu
-  chat_id: "oc_xxxx"      # 飞书 chat_id（群组或单聊）
+  chat_id: "<your-chat-id>"      # 飞书 chat ID（群组或单聊）
 ```
 
 ### 模型配置
@@ -265,7 +265,7 @@ curl -X POST http://localhost:8080/gateway/cron/jobs \
     "cron": "0 9 * * 1-5",
     "prompt": "请生成今日工作日报",
     "channel": "feishu",
-    "chat_id": "oc_xxxx",
+    "chat_id": "<your-chat-id>",
     "timeout": 120
   }'
 ```

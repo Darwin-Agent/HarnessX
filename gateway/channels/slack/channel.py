@@ -62,8 +62,8 @@ class SlackChannel(BaseChannel):
         "type": "object",
         "required": ["bot_token", "app_token"],
         "properties": {
-            "bot_token": {"type": "string", "title": "Bot Token (xoxb-…)", "format": "password"},
-            "app_token": {"type": "string", "title": "App Token (xapp-…)", "format": "password"},
+            "bot_token": {"type": "string", "title": "Bot Token", "format": "password"},
+            "app_token": {"type": "string", "title": "App Token", "format": "password"},
             "signing_secret": {"type": "string", "title": "Signing Secret", "format": "password"},
             "require_mention": {"type": "boolean", "default": True},
             "free_response_channels": {

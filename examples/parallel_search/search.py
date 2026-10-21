@@ -4,15 +4,19 @@
 
 import argparse
 import asyncio
+import os
 import uuid
 
 from harnessx.tools.mcp import MCPToolRegistry
 
 
 async def search(objective, queries, urls):
+    endpoint = os.environ.get("MCP_SEARCH_URL", "").strip()
+    if not endpoint:
+        raise RuntimeError("Set MCP_SEARCH_URL to the search service endpoint before running this example.")
     registry = MCPToolRegistry(
         transport="http",
-        url="https://search.parallel.ai/mcp",
+        url=endpoint,
         name="parallel-search",
         headers={"User-Agent": "HarnessX/0.1.0 (Parallel Search example)"},
     )

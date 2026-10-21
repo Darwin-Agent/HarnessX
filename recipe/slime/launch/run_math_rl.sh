@@ -24,7 +24,7 @@ ray stop --force 2>/dev/null
 pkill -9 ray 2>/dev/null; pkill -9 python 2>/dev/null; sleep 3
 pkill -9 ray 2>/dev/null; pkill -9 python 2>/dev/null
 
-set -ex
+set -e
 
 # keep stdout/stderr unbuffered in ray jobs
 export PYTHONUNBUFFERED=1
@@ -58,7 +58,7 @@ MEGATRON_ROOT="${MEGATRON_ROOT:?MEGATRON_ROOT env var is required}"
 DATA_ROOT="${DATA_ROOT:?DATA_ROOT env var is required}"
 export HF_HOME="${DATA_ROOT}/hf_cache"
 export HF_HUB_ENABLE_HF_TRANSFER=1
-export HF_ENDPOINT="https://hf-mirror.com"
+export HF_ENDPOINT="${HF_ENDPOINT:-}"
 CKPT_ROOT="${DATA_ROOT}/harnessx_slime/ckpt"
 
 # NVLink detection (identical to retool)
@@ -210,20 +210,20 @@ CUSTOM_ARGS=(
 # ── Launch Ray ────────────────────────────────────────────────────────────────
 export PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF:-"max_split_size_mb:2048,expandable_segments:True"}
 
-export MASTER_ADDR="${MASTER_ADDR:-127.0.0.1}"
-export no_proxy="127.0.0.1,${MASTER_ADDR}"
+export MASTER_ADDR="${MASTER_ADDR:-localhost}"
+export no_proxy="localhost,${MASTER_ADDR}"
 
 # Collect all local IPs so Ray workers can bypass proxy for intra-node traffic
-# (SGLang servers bind to the actual host IP, not 127.0.0.1)
+# SGLang servers may bind to additional host addresses; add them at runtime.
 LOCAL_IPS=$(hostname -I 2>/dev/null | tr ' ' ',' | sed 's/,$//')
-NO_PROXY_LIST="127.0.0.1,localhost,${MASTER_ADDR}${LOCAL_IPS:+,${LOCAL_IPS}}"
+NO_PROXY_LIST="localhost,${MASTER_ADDR}${LOCAL_IPS:+,${LOCAL_IPS}}"
 echo "no_proxy for Ray workers: ${NO_PROXY_LIST}"
 
 ray start --head \
     --node-ip-address "${MASTER_ADDR}" \
     --num-gpus ${NUM_GPUS} \
     --disable-usage-stats \
-    --dashboard-host=0.0.0.0 \
+    --dashboard-host="${RAY_DASHBOARD_HOST:-localhost}" \
     --dashboard-port=8265
 
 RUNTIME_ENV_JSON="{
@@ -231,7 +231,7 @@ RUNTIME_ENV_JSON="{
     \"PYTHONPATH\": \"${MEGATRON_ROOT}:${SLIME_ROOT}:${HX_ROOT}\",
     \"HF_HOME\": \"${DATA_ROOT}/hf_cache\",
     \"HF_HUB_ENABLE_HF_TRANSFER\": \"1\",
-    \"HF_ENDPOINT\": \"https://hf-mirror.com\",
+    \"HF_ENDPOINT\": \"${HF_ENDPOINT}\",
     \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
     \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\",
     \"PYTORCH_CUDA_ALLOC_CONF\": \"${PYTORCH_CUDA_ALLOC_CONF}\",
@@ -242,7 +242,7 @@ RUNTIME_ENV_JSON="{
   }
 }"
 
-ray job submit --address="http://127.0.0.1:8265" \
+ray job submit --address="http://${RAY_DASHBOARD_HOST:-localhost}:${RAY_DASHBOARD_PORT:-8265}" \
     --runtime-env-json="${RUNTIME_ENV_JSON}" \
     -- python3 "${SLIME_ROOT}/train_async.py" \
         --actor-num-nodes         1 \

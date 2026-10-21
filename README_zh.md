@@ -115,7 +115,7 @@ cd frontend && npm install && npm run build && cd ..
 ### CLI
 
 ```bash
-export ANTHROPIC_API_KEY=sk-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 
 hx "研究 2026 年 AI Agent 趋势并撰写结构化报告"
 hx -p "用 Python 写一个 fizzbuzz"     # 非交互模式，输出后退出
@@ -164,12 +164,12 @@ asyncio.run(main())
 <a id="benchmarks"></a>
 ## 📊 基准测试
 
-HarnessX 提供两个进化循环，可在任意基准测试上系统性地提升 Agent 性能：
+本项目包含两套不同的 Harness/模型进化流程，请区分其实现与结果：
 
-- **Harness 进化** —— 元 Harness 分析轨迹，自动搜索更优的处理器组合、提示策略和工具配置，*无需更换模型*。
-- **模型进化** —— Harness 运行产生的带奖励标注轨迹通过 [VERL](https://github.com/volcengine/verl) 驱动 RL 微调，持续改进模型本身。
+- **旧方法——顺序进化**：先用 GAIA 进化 Harness/配置，再用 GRPO 优化模型，分两个连续阶段执行。
+- **集成式协同进化**：在 veRL GRPO 训练中运行 Harness agent rollout；这是独立流程，使用单独的运行入口。
 
-两个循环可组合使用：先进化 Harness，再在此基础上进化模型。以下是在 [GAIA](https://huggingface.co/datasets/gaia-benchmark/GAIA) 基准测试上的结果。更多基准测试及适配器详情，见 [`benchmarks/README.md`](benchmarks/README.md)。
+下方结果属于旧方法及其 Harness 进化实验，**不是集成式协同进化方法的结果**。可用命令及数据要求请分别参阅对应配方说明。更多基准测试及适配器详情，见 [`benchmarks/README.md`](benchmarks/README.md)。
 
 ### Harness 进化（Qwen 3.5 9B）
 
@@ -187,13 +187,17 @@ HarnessX 提供两个进化循环，可在任意基准测试上系统性地提�
   <img src="docs/assets/Harness_Evolution.png" alt="Harness Evolution — Per-Domain Accuracy" width="700"/>
 </p>
 
-### 模型-Harness 协同进化（Qwen 3.5 9B）
+### 旧方法结果：先 Harness 进化，再优化模型（Qwen 3.5 9B）
 
-两个循环协同运行时，收益叠加：Harness 进化将基线从 33.97% 提升至 41.67%；模型进化进一步推至 **55.77%** —— **相对提升 +64%**，全程基于 9B 模型。→ 复现：[`recipe/verl_harnessX/`](recipe/verl_harnessX/)
+旧的两阶段方法中，Harness 进化将基线从 33.97% 提升至 41.67%；随后模型优化进一步推至 **55.77%** —— **相对提升 +64%**，全程基于 9B 模型。该结果属于旧方法，不属于集成式协同进化方法。→ 复现旧方法：先运行 [`recipe/gaia_evolver/`](recipe/gaia_evolver/)，再运行 [`recipe/verl_harnessX/`](recipe/verl_harnessX/)。
 
 <p align="center">
   <img src="docs/assets/HarnessX_Model_Co_evolution.png" alt="Model-Harness Co-Evolution" width="700"/>
 </p>
+
+### 集成式协同进化
+
+运行独立的集成式协同进化流程：[`recipe/verl/launch/run_research_rl.sh`](recipe/verl/launch/run_research_rl.sh)。该流程不会运行旧版 GAIA Harness 进化阶段。环境准备和运行命令见[`docs/guide/evolution.md`](docs/guide/evolution.md)。上方基准结果属于旧方法，不属于集成式协同进化。
 
 ---
 

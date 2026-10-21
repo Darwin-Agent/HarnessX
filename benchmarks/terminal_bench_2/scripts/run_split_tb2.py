@@ -151,7 +151,7 @@ def main() -> None:
         "--api-base",
         required=True,
         metavar="URL",
-        help="API base URL (e.g. https://api.anthropic.com, http://127.0.0.1:8061/v1)",
+        help="API base URL supplied by the user",
     )
     parser.add_argument(
         "--extra-headers",

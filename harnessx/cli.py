@@ -1991,7 +1991,7 @@ def _lab(args) -> None:
 
     import asyncio
 
-    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="warning")
+    config = uvicorn.Config(app, host="localhost", port=port, log_level="warning")
     server = uvicorn.Server(config)
 
     async def _serve() -> None:

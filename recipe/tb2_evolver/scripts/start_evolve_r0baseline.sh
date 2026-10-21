@@ -8,7 +8,7 @@
 #   (repeat for NUM_ROUNDS)
 #
 # Usage:
-#   cd /root/evolution/HarnessX
+#   cd <repository-root>
 #   bash recipe/tb2_evolver/scripts/start_evolve_r0baseline.sh
 #
 # Optional env overrides:

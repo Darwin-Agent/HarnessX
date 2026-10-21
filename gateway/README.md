@@ -72,22 +72,22 @@ Create `~/.harnessx/gateway.yaml`:
 ```yaml
 gateway:
   agent_id: gateway       # agent identity (used for workspace isolation)
-  host: 0.0.0.0
+  host: "<bind-host>"
   port: 8080
 
 channels:
   telegram:
     enabled: true
     channel_type: telegram  # platform type; only needed when instance name differs
-    bot_token: "your-bot-token"
+    bot_token: "<your-bot-token>"
     allowed_users: []       # empty = open to everyone
 
   feishu:
     enabled: false
     channel_type: feishu
-    app_id: "cli_xxx"
-    app_secret: "xxx"
-    verification_token: "xxx"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
+    verification_token: "<your-verification-token>"
     encrypt_key: ""
 ```
 
@@ -106,7 +106,7 @@ main:
 Or set the environment variable:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 ```
 
 ### 4. Start
@@ -170,8 +170,8 @@ All channels share these common fields:
 ```yaml
 telegram:
   enabled: true
-  bot_token: "123456:ABC-..."
-  allowed_users: ["@alice", "123456789"]
+  bot_token: "<your-bot-token>"
+  allowed_users: ["<your-user-id>"]
 ```
 
 [Create a bot](https://t.me/BotFather) with `/newbot`. No extra permissions needed.
@@ -181,9 +181,9 @@ telegram:
 ```yaml
 feishu:
   enabled: true
-  app_id: "cli_xxx"
-  app_secret: "xxx"
-  verification_token: "xxx"   # from Event Subscriptions page
+  app_id: "<your-app-id>"
+  app_secret: "<your-app-secret>"
+  verification_token: "<your-verification-token>"   # from Event Subscriptions page
   encrypt_key: ""              # optional
 ```
 
@@ -194,9 +194,9 @@ In the Feishu developer console: enable **Bot** capability, subscribe to `im.mes
 ```yaml
 slack:
   enabled: true
-  bot_token: "xoxb-..."
-  signing_secret: "xxx"
-  app_token: "xapp-..."       # for Socket Mode (no public URL needed)
+  bot_token: "<your-bot-token>"
+  signing_secret: "<your-signing-secret>"
+  app_token: "<your-app-token>"       # for Socket Mode (no public URL needed)
 ```
 
 ### Discord
@@ -204,8 +204,8 @@ slack:
 ```yaml
 discord:
   enabled: true
-  bot_token: "Bot xxx"
-  allowed_guilds: []          # server IDs to respond in; empty = all
+  bot_token: "<your-bot-token>"
+  allowed_guilds: ["<your-server-id>"]  # empty = all
   require_mention: false
 ```
 
@@ -216,8 +216,8 @@ Enable **Message Content Intent** in the Discord Developer Portal → Bot → Pr
 ```yaml
 dingtalk:
   enabled: true
-  client_id: "xxx"
-  client_secret: "xxx"
+  client_id: "<your-client-id>"
+  client_secret: "<your-client-secret>"
 ```
 
 ---

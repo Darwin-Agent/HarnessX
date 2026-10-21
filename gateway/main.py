@@ -319,7 +319,7 @@ def _instantiate_channels(config: dict, dispatcher: Any) -> list[Any]:
 # ── Async server loop ──────────────────────────────────────────────────────────
 
 
-async def _run(config_path: Path | None = None, host: str = "0.0.0.0", port: int = 8080) -> None:
+async def _run(config_path: Path | None = None, host: str = "localhost", port: int = 8080) -> None:
     config = _load_config(config_path)
     gateway_cfg = config.get("gateway", {})
 
@@ -596,7 +596,7 @@ def main() -> None:
         metavar="PATH",
         help="Path to gateway.yaml (default: ~/.harnessx/gateway.yaml)",
     )
-    p_start.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+    p_start.add_argument("--host", default="localhost", help="Bind host (default: localhost)")
     p_start.add_argument("--port", type=int, default=8080, help="Bind port (default: 8080)")
     p_start.add_argument(
         "--log-level", default="INFO", metavar="LEVEL", help="Log level: DEBUG|INFO|WARNING (default: INFO)"
@@ -608,7 +608,7 @@ def main() -> None:
     # ── restart ───────────────────────────────────────────────────────────────
     p_restart = sub.add_parser("restart", help="Restart the gateway")
     p_restart.add_argument("-c", "--config", type=Path, default=None, metavar="PATH")
-    p_restart.add_argument("--host", default="0.0.0.0")
+    p_restart.add_argument("--host", default="localhost")
     p_restart.add_argument("--port", type=int, default=8080)
     p_restart.add_argument("--log-level", default="INFO", metavar="LEVEL")
 
@@ -623,7 +623,7 @@ def main() -> None:
     # ── _serve (internal, launched by start) ──────────────────────────────────
     p_serve = sub.add_parser("_serve", help=argparse.SUPPRESS)
     p_serve.add_argument("-c", "--config", type=Path, default=None)
-    p_serve.add_argument("--host", default="0.0.0.0")
+    p_serve.add_argument("--host", default="localhost")
     p_serve.add_argument("--port", type=int, default=8080)
     p_serve.add_argument("--log-level", default="INFO")
 
