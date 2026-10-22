@@ -116,7 +116,7 @@ cd frontend && npm install && npm run build && cd ..
 ### CLI
 
 ```bash
-export ANTHROPIC_API_KEY=sk-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 
 hx "Research 2026 AI agent trends and write a structured report"
 hx -p "Write a Python fizzbuzz"     # non-interactive, print and exit
@@ -165,12 +165,7 @@ asyncio.run(main())
 <a id="benchmarks"></a>
 ## 📊 Benchmarks
 
-HarnessX provides two evolution loops that systematically improve agent performance on any benchmark:
-
-- **Harness Evolution** — a meta-harness analyzes trajectories and automatically searches for better processor combinations, prompt strategies, and tool configurations, *without changing the model*.
-- **Model Evolution** — reward-annotated trajectories from harness runs feed RL fine-tuning (via [VERL](https://github.com/volcengine/verl)), improving the model itself.
-
-The two loops compose: evolve the harness first, then evolve the model on top. Below are results on the [GAIA](https://huggingface.co/datasets/gaia-benchmark/GAIA) benchmark. See [`benchmarks/README.md`](benchmarks/README.md) for additional benchmarks and adapter details.
+HarnessX supports harness search, distributed model training, and alternating Harness + Model co-evolution. The experiments below cover harness search and sequential harness-then-model optimization. See the [evolution guide](docs/guide/evolution.md) for the available workflows and [`benchmarks/README.md`](benchmarks/README.md) for benchmark adapters.
 
 ### Harness Evolution (Qwen 3.5 9B)
 
@@ -188,13 +183,19 @@ The same approach scales to frontier models. Overall GAIA accuracy rises from 62
   <img src="docs/assets/Harness_Evolution.png" alt="Harness Evolution — Per-Domain Accuracy" width="700"/>
 </p>
 
-### Model-Harness Co-Evolution (Qwen 3.5 9B)
+### Sequential Evolution: Harness First, Then Model (Qwen 3.5 9B)
 
-When the two loops run together, the gains compound: harness evolution lifts the baseline from 33.97% to 41.67%; model evolution pushes it further to **55.77%** — a **+64% relative improvement**, all on a 9B model. → Reproduce: [`recipe/verl_harnessX/`](recipe/verl_harnessX/)
+In the two-stage workflow, Harness evolution lifts the baseline from 33.97% to 41.67%; subsequent model optimization pushes it further to **55.77%** — a **+64% relative improvement**, all on a 9B model. → Run [`recipe/gaia_evolver/`](recipe/gaia_evolver/) followed by [`recipe/verl_harnessX/`](recipe/verl_harnessX/).
 
 <p align="center">
   <img src="docs/assets/HarnessX_Model_Co_evolution.png" alt="Model-Harness Co-Evolution" width="700"/>
 </p>
+
+### Alternating Harness + Model Co-Evolution
+
+Each round runs normal agent exploration with the current Harness population and saves its trajectories. After exploration, MetaAgent performs AEGIS Harness evolution from those trajectories; cross-Harness model evolution then updates the model offline from the saved buffer. The single exploration rollout is ordinary agent sampling; model training itself does not generate responses. The evolved Harness state and updated model carry forward together.
+
+Start with `python -m recipe.coevolution.run --backend verl`. The [co-evolution runbook](recipe/coevolution/README.md) covers environment setup, data formats, meta-model configuration, checkpoint export, and resume.
 
 ---
 
@@ -224,8 +225,8 @@ HarnessX/
 │   ├── bundles/               # 📦 Pre-composed capability bundles
 │   ├── api/                   # 🌐 FastAPI + SSE for Lab UI
 │   └── cli.py                 # ⌨️ CLI entry point (hx)
-├── benchmarks/                # 📊 4 integrated + 3 ongoing benchmarks
-├── recipe/                    # 🧪 slime (RL training recipe)
+├── benchmarks/                # 📊 5 integrated + 2 ongoing benchmarks
+├── recipe/                    # 🧪 Co-evolution, veRL, Slime, benchmark evolution
 ├── examples/                  # 📖 coding / research / assistant / custom_processor
 ├── extensions/                # 🔌 Skills (docx, pdf, pptx, xlsx)
 ├── frontend/                  # 🖥️ Lab UI (React + TypeScript + Tailwind)
@@ -241,30 +242,37 @@ HarnessX/
 
 | Phase | Focus | Status |
 |:-----:|-------|:------:|
-| **1** | Core: 9-dimension behavior pipeline, 13 processors, multi-provider, SFT/RL bridge, 4 benchmarks, Lab UI | ![current](https://img.shields.io/badge/-current-22c55e?style=flat-square) |
+| **1** | Core: 9-dimension behavior pipeline, 13 processors, multi-provider, SFT/RL bridge, 5 benchmarks, Lab UI | ![current](https://img.shields.io/badge/-current-22c55e?style=flat-square) |
 | **2** | Meta-opt: Bayesian Optimization, Meta-Harness, auto config search | ![in progress](https://img.shields.io/badge/-in%20progress-f59e0b?style=flat-square) |
-| **3** | Self-evolution: closed-loop training, HarnessHUB community marketplace | ![planned](https://img.shields.io/badge/-planned-8b5cf6?style=flat-square) |
-| **4** | Memory: multimodal backends, third-party integrations (VERL, SuperMemory, OpenVKing) | ![planned](https://img.shields.io/badge/-planned-8b5cf6?style=flat-square) |
+| **3** | Self-evolution: alternating Harness + Model training; HarnessHUB community marketplace | ![in progress](https://img.shields.io/badge/-in%20progress-f59e0b?style=flat-square) |
+| **4** | Memory: Light-Memory, LoCoMo; multimodal backends and third-party memory adapters | ![in progress](https://img.shields.io/badge/-in%20progress-f59e0b?style=flat-square) |
 
-### In-Repo Implementations
+### Available Now
 
-- [x] **[Light-Memory](docs/feats/light-memory.md)** — file-based memory with time-decay, daily compression, git versioning (`harnessx/plugins/dimensions/light_memory/`)
-- [x] **Slime RL recipe** — SGLang rollout adapter + token annotation + GRPO training pipeline (`recipe/slime/`)
-- [x] **MetaHarness** — agent observes its own trajectories and proposes harness config changes; observer harness + meta-agent + sandboxed promotion loop
-- [ ] **LoCoMo benchmark** — long-context memory evaluation: session recall, cross-turn consistency, compaction fidelity
-- [ ] **Bayesian Optimization** — surrogate model search over the ~10^6-configuration harness space
-- [ ] **HarnessHUB** — community platform to publish, version, and pull `HarnessConfig` bundles (`hx pull coding-agent@v1.2`; Lab UI panel; private registries)
-- [ ] **Multimodal Memory** — CLIP-based image/video memory backend via the plugin system
-- [ ] **Harness Memory Evolution** — closed loop: trajectories → RL fine-tuning → better model → better harness; population-level mutation + data flywheel
+- ✅ **[Light-Memory](docs/feats/light-memory.md)** — file-based memory with time-decay, daily compression, git versioning (`harnessx/plugins/dimensions/light_memory/`)
+- ✅ **Slime RL recipe** — SGLang rollout adapter + token annotation + GRPO training pipeline (`recipe/slime/`)
+- ✅ **MetaHarness** — agent observes its own trajectories and proposes harness config changes; observer harness + meta-agent + sandboxed promotion loop
+- ✅ **[LoCoMo benchmark](benchmarks/locomo/README.md)** — multi-session conversational memory evaluation, configurable session compression, QA scoring, and LLM-as-Judge
+- ✅ **[Harness + Model Co-Evolution](recipe/coevolution/README.md)** — alternating MetaAgent harness search and cross-harness GRPO; checkpoint export and round-by-round resume
 
-### Third-Party Integrations *(opt-in, live in `recipe/`)*
+### Planned
 
-- [x] **[VERL](https://github.com/volcengine/verl)** — connect HarnessX rollouts to distributed PPO / GRPO training loops
-- [ ] **[MemPalace](https://github.com/mem-palace/mem-palace)** — structured episodic memory backend
-- [ ] **[SuperMemory](https://supermemory.ai)** — cloud-backed semantic memory via the plugin system
-- [ ] **[OpenVKing](https://github.com/openvking)** — vector-knowledge-graph memory for entity-rich domains
-- [ ] **Memory quality metrics** — retrieval precision / recall surfaced through HarnessJournal
-- [ ] **Data synthesis pipeline** — controlled SFT / preference-dataset generation with diversity constraints
+- ◻️ **Bayesian Optimization** — surrogate model search over the ~10^6-configuration harness space
+- ◻️ **HarnessHUB** — community platform to publish, version, and pull `HarnessConfig` bundles (`hx pull coding-agent@v1.2`; Lab UI panel; private registries)
+- ◻️ **Multimodal Memory** — CLIP-based image/video memory backend via the plugin system
+- ◻️ **Harness Memory Evolution** — memory-specialized population search and a deployment-to-training data flywheel
+
+### Available Integrations *(opt-in, live in `recipe/`)*
+
+- ✅ **[veRL](recipe/verl/README.md)** — HarnessX rollouts and distributed GRPO training
+
+### Planned Integrations
+
+- ◻️ **[MemPalace](https://github.com/mem-palace/mem-palace)** — structured episodic memory backend
+- ◻️ **[SuperMemory](https://supermemory.ai)** — cloud-backed semantic memory via the plugin system
+- ◻️ **[OpenVKing](https://github.com/openvking)** — vector-knowledge-graph memory for entity-rich domains
+- ◻️ **Memory quality metrics** — retrieval precision / recall surfaced through HarnessJournal
+- ◻️ **Data synthesis pipeline** — controlled SFT / preference-dataset generation with diversity constraints
 
 ---
 

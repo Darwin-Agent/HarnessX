@@ -1,5 +1,7 @@
 # Architecture
 
+**English** | [简体中文](architecture.zh-CN.md)
+
 <p align="center">
   <img src="assets/harnessx_architecture.png" alt="HarnessX Architecture" width="800"/>
 </p>

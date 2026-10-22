@@ -187,7 +187,7 @@ class ProviderGroup(AgenticMixin, BaseModelProvider):
             # 1. Full config (recommended for production)
             ProviderEntry(
                 type="anthropic",
-                api_key="sk-ant-...",
+                api_key="<your-api-key>",
                 models=[
                     ModelEntry("claude-sonnet-4-6", temperature=0.7, is_default=True),
                     ModelEntry("claude-haiku-4-5"),

@@ -9,7 +9,7 @@ HarnessX benchmark adapters — each sub-directory is a self-contained adapter f
 | `swebench/` | [SWE-bench](https://github.com/SWE-bench/SWE-bench) | [Available](swebench/README.md) |
 | `tau2/` | [TAU2-Bench](https://github.com/sierra-research/tau2-bench) | [Available](tau2/README.md) |
 | `evoclaw/` | [EvoClAW](https://github.com/EvoClaw-Bench/EvoClaw) | Ongoing |
-| `locomo/` | [LoCoMo](https://github.com/snap-research/locomo) | Ongoing |
+| `locomo/` | [LoCoMo](https://github.com/snap-research/locomo) | [Available](locomo/README.md) |
 | `osworld/` | [OSWorld](https://github.com/xlang-ai/OSWorld) | Ongoing |
 
 ---

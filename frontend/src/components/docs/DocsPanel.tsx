@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { X, BookOpen, ChevronRight, Home, Loader, ArrowLeft } from 'lucide-react'
 import { marked } from 'marked'
 import { useDocsStore } from '../../store/docs'
+import { useUIStore } from '../../store/ui'
+import { useT } from '../../i18n'
+import { resolveDocLink } from '../../lib/docs'
 import { api } from '../../api/client'
 import type { DocTree, DocSection, DocEntry } from '../../api/types'
 
@@ -19,6 +22,7 @@ function DocNav({
   currentPath: string | null
   onNavigate: (path: string) => void
 }) {
+  const t = useT()
   return (
     <nav
       className="flex flex-col gap-5 py-4"
@@ -40,7 +44,7 @@ function DocNav({
         }}
       >
         <Home size={13} style={{ flexShrink: 0 }} />
-        Overview
+        {t('docs.overview')}
       </button>
 
       {tree.sections.map((section: DocSection) => (
@@ -105,6 +109,7 @@ function DocIndex({
   tree: DocTree
   onNavigate: (path: string) => void
 }) {
+  const t = useT()
   return (
     <div className="px-8 py-8" style={{ maxWidth: '640px' }}>
       <div className="flex items-center gap-3 mb-6">
@@ -116,10 +121,10 @@ function DocIndex({
         </div>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.2 }}>
-            Documentation
+            {t('docs.title')}
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '2px' }}>
-            HarnessX Harness Lab
+            {t('docs.lab')}
           </p>
         </div>
       </div>
@@ -179,6 +184,8 @@ function DocIndex({
 
 export function DocsPanel() {
   const { isOpen, path, close, navigate } = useDocsStore()
+  const { lang, setLang } = useUIStore()
+  const t = useT()
   const [tree, setTree]         = useState<DocTree | null>(null)
   const [content, setContent]   = useState<string>('')
   const [title, setTitle]       = useState<string>('')
@@ -186,40 +193,48 @@ export function DocsPanel() {
   const [error, setError]       = useState<string | null>(null)
   const [history, setHistory]   = useState<string[]>([])
   const contentRef = useRef<HTMLDivElement>(null)
+  const requestVersion = useRef(0)
 
   // Fetch tree on first open
   useEffect(() => {
-    if (isOpen && !tree) {
-      api.docTree()
-        .then(setTree)
-        .catch((e) => console.error('docTree error:', e))
-    }
-  }, [isOpen, tree])
+    if (!isOpen) return
+    let active = true
+    setTree(null)
+    api.docTree(lang)
+      .then((value) => { if (active) setTree(value) })
+      .catch((e) => console.error('docTree error:', e))
+    return () => { active = false }
+  }, [isOpen, lang])
 
   // Fetch content when path changes
   const loadContent = useCallback(async (docPath: string) => {
+    const version = ++requestVersion.current
     if (docPath === '__index__') {
       setContent('')
       setTitle('')
       setError(null)
+      setLoading(false)
       return
     }
     setLoading(true)
     setError(null)
+    setContent('')
+    setTitle('')
     try {
-      const doc = await api.docContent(docPath)
+      const doc = await api.docContent(docPath, lang)
+      if (version !== requestVersion.current) return
       setTitle(doc.title)
       setContent(doc.content)
     } catch (e) {
-      setError(String(e))
+      if (version === requestVersion.current) setError(String(e))
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) setLoading(false)
     }
-  }, [])
+  }, [lang])
 
   useEffect(() => {
-    if (isOpen && path) {
-      loadContent(path)
+    if (isOpen) {
+      loadContent(path || '__index__')
     }
   }, [isOpen, path, loadContent])
 
@@ -251,20 +266,11 @@ export function DocsPanel() {
     if (!anchor) return
     const href = anchor.getAttribute('href')
     if (!href) return
-    // Internal doc link: relative paths like "../feats/plugins" or "feats/plugins"
-    if (!href.startsWith('http') && !href.startsWith('#')) {
-      e.preventDefault()
-      // Resolve relative to current path
-      let resolved = href
-      if (href.startsWith('../') && path) {
-        const parts = path.split('/')
-        const hrefParts = href.replace(/^\.\.\//, '').split('/')
-        resolved = [...parts.slice(0, -1), ...hrefParts].join('/')
-        // Strip .md extension if present
-        resolved = resolved.replace(/\.md$/, '')
-      }
-      handleNavigate(resolved)
-    }
+    const resolved = resolveDocLink(href, path)
+    if (!resolved) return
+    e.preventDefault()
+    if (resolved.lang) setLang(resolved.lang)
+    handleNavigate(resolved.path)
   }
 
   if (!isOpen) return null
@@ -315,8 +321,22 @@ export function DocsPanel() {
 
           <BookOpen size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
           <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-1)', flex: 1 }}>
-            {showIndex ? 'Documentation' : (title || 'Documentation')}
+            {showIndex ? t('docs.title') : (title || t('docs.title'))}
           </span>
+
+          <div className="flex items-center gap-1">
+            {(['en', 'zh'] as const).map((value) => (
+              <button
+                key={value}
+                onClick={() => setLang(value)}
+                aria-pressed={lang === value}
+                className="px-2 py-1 rounded-lg text-xs"
+                style={{ color: lang === value ? 'var(--accent)' : 'var(--text-3)' }}
+              >
+                {value === 'en' ? 'English' : '简体中文'}
+              </button>
+            ))}
+          </div>
 
           <button
             onClick={close}

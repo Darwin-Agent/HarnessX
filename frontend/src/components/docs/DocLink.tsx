@@ -1,5 +1,6 @@
 import { BookOpen } from 'lucide-react'
 import { useDocsStore } from '../../store/docs'
+import { useT } from '../../i18n'
 
 interface DocLinkProps {
   /** Doc path to open, e.g. "feats/plugins". Opens the index if omitted. */
@@ -14,13 +15,14 @@ interface DocLinkProps {
  * Small contextual button that opens the DocsPanel at a specific page.
  * Place near section headers on Settings pages.
  */
-export function DocLink({ path, title = 'Open docs', label }: DocLinkProps) {
+export function DocLink({ path, title, label }: DocLinkProps) {
   const open = useDocsStore((s) => s.open)
+  const t = useT()
 
   return (
     <button
       onClick={() => open(path ?? null)}
-      title={title}
+      title={title || t('docs.open')}
       className="inline-flex items-center gap-1 rounded-lg transition-colors"
       style={{
         padding: label ? '3px 8px' : '3px 5px',

@@ -3,6 +3,7 @@ import { BookOpen, ChevronRight, Home, Loader, ArrowLeft } from 'lucide-react'
 import { marked } from 'marked'
 import { api } from '@gw/api/client'
 import { useUIStore } from '@lab/store/ui'
+import { useT } from '@gw/i18n'
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -22,6 +23,7 @@ function DocNav({
   currentPath: string | null
   onNavigate: (path: string) => void
 }) {
+  const t = useT()
   return (
     <nav className="flex flex-col gap-5 py-4" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
       <button
@@ -35,7 +37,7 @@ function DocNav({
         }}
       >
         <Home size={13} style={{ flexShrink: 0 }} />
-        Overview
+        {t('docs.overview')}
       </button>
 
       {tree.sections.map((section) => (
@@ -94,6 +96,7 @@ function DocNav({
 // ── Overview index ────────────────────────────────────────────────────────────
 
 function DocIndex({ tree, onNavigate }: { tree: DocTree; onNavigate: (path: string) => void }) {
+  const t = useT()
   return (
     <div className="px-8 py-8" style={{ maxWidth: '640px' }}>
       <div className="flex items-center gap-3 mb-6">
@@ -105,10 +108,10 @@ function DocIndex({ tree, onNavigate }: { tree: DocTree; onNavigate: (path: stri
         </div>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.2 }}>
-            Gateway Docs
+            {t('docs.gateway')}
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '2px' }}>
-            HarnessX IM Gateway
+            {t('docs.gateway_product')}
           </p>
         </div>
       </div>
@@ -168,6 +171,7 @@ function DocIndex({ tree, onNavigate }: { tree: DocTree; onNavigate: (path: stri
 
 export function DocsPage() {
   const lang = useUIStore((s) => s.lang)
+  const t = useT()
 
   const [tree, setTree]       = useState<DocTree | null>(null)
   const [path, setPath]       = useState<string | null>(null)
@@ -281,11 +285,11 @@ export function DocsPage() {
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-3)' }}
             >
               <ArrowLeft size={13} />
-              Back
+              {t('status.back')}
             </button>
           )}
           <span style={{ fontSize: '13px', color: showIndex ? 'var(--text-3)' : 'var(--text-1)', fontWeight: showIndex ? 400 : 500 }}>
-            {showIndex ? 'Gateway Documentation' : title}
+            {showIndex ? t('docs.gateway') : title}
           </span>
         </div>
 

@@ -68,8 +68,8 @@ Config file:
 channels:
   feishu:
     enabled: true
-    app_id: "cli_xxxx"
-    app_secret: "xxxxxxxxxxxx"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
     mode: websocket           # Default is websocket, can be omitted
     require_mention: true     # @mention required in group chats
     reply_in_thread: false
@@ -92,11 +92,11 @@ Config file:
 channels:
   feishu:
     enabled: true
-    app_id: "cli_xxxx"
-    app_secret: "xxxxxxxxxxxx"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
     mode: webhook
-    verification_token: "xxxx"   # Verification Token from the Event Subscriptions page
-    encrypt_key: "xxxx"          # Optional: AES encryption key
+    verification_token: "<your-verification-token>"   # Verification Token from the Event Subscriptions page
+    encrypt_key: "<your-encrypt-key>"          # Optional: AES encryption key
     require_mention: true
 ```
 
@@ -196,8 +196,8 @@ channels:
   feishu:
     enabled: true
     channel_type: feishu
-    app_id: "cli_a1b2c3d4e5f6"
-    app_secret: "your_app_secret_here"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
     mode: websocket
     require_mention: true
     reply_in_thread: false

@@ -32,8 +32,7 @@ mkdir -p "${HF_HOME}" "${CKPT_ROOT}"
 # ── High-speed download configuration ────────────────────────────────────────
 # hf_transfer: multi-threaded concurrent downloads, 3-5x faster than default
 export HF_HUB_ENABLE_HF_TRANSFER=0
-# HF_ENDPOINT: uncomment to use mirror if direct HF connection is slow
-export HF_ENDPOINT="https://hf-mirror.com"
+export HF_ENDPOINT="${HF_ENDPOINT:-https://huggingface.co}"
 
 SKIP_DATA=0
 SKIP_MODELS=0

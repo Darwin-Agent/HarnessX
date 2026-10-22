@@ -14,7 +14,7 @@ Usage::
         session_id=...,
         trial_paths=...,
         task_env_config=...,
-        server_url="http://10.x.x.x:12081",
+        server_url="<your-opensandbox-url>",
     )
 """
 

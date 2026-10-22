@@ -1,0 +1,100 @@
+# veRL GRPO configuration for a transformers 4.x-compatible model, 8 GPUs.
+# Dataset, model, and output locations are supplied through environment variables.
+
+data:
+  train_files: ${oc.env:DATA_DIR}/train.parquet
+  val_files:
+    - ${oc.env:DATA_DIR}/val.parquet
+  train_batch_size: 4
+  max_prompt_length: 8192
+  max_response_length: 32768
+  prompt_key: prompt
+  reward_fn_key: data_source
+  return_raw_chat: True
+  return_multi_modal_inputs: False
+  filter_overlong_prompts: True
+  shuffle: True
+
+actor_rollout_ref:
+  hybrid_engine: True
+  model:
+    path: ${oc.env:MODEL_DIR}
+    use_remove_padding: True
+    enable_gradient_checkpointing: True
+  actor:
+    strategy: fsdp
+    ulysses_sequence_parallel_size: 2
+    optim:
+      lr: 1e-6
+    ppo_mini_batch_size: 4
+    ppo_micro_batch_size_per_gpu: 1
+    ppo_max_token_len_per_gpu: 32768
+    use_kl_loss: True
+    kl_loss_coef: 0.001
+    entropy_coeff: 0.0
+    fsdp_config:
+      param_offload: True
+      optimizer_offload: True
+  rollout:
+    name: sglang
+    skip_tokenizer_init: False
+    engine_kwargs:
+      sglang:
+        attention_backend: triton
+    mode: async
+    n: 2
+    temperature: 1.0
+    top_p: 0.95
+    tensor_model_parallel_size: 1
+    gpu_memory_utilization: 0.8
+    max_num_batched_tokens: 65536
+    enforce_eager: False
+    free_cache_engine: True
+    enable_chunked_prefill: True
+    log_prob_micro_batch_size_per_gpu: 1
+    log_prob_use_dynamic_bsz: False
+    log_prob_max_token_len_per_gpu: 32768
+    multi_turn:
+      max_assistant_turns: 12
+      max_user_turns: 12
+    agent:
+      num_workers: 8
+      default_agent_loop: harnessx_full
+      agent_loop_config_path: ${oc.env:SCRIPT_DIR}/agent_loop_config.yaml
+  ref:
+    log_prob_micro_batch_size_per_gpu: 1
+    log_prob_use_dynamic_bsz: False
+    log_prob_max_token_len_per_gpu: 32768
+    fsdp_config:
+      param_offload: True
+
+algorithm:
+  adv_estimator: grpo
+  norm_adv_by_std_in_grpo: True
+  kl_ctrl:
+    kl_coef: 0.0
+  # filter_groups:
+  #   enable: True
+  #   metric: score
+  #   max_num_gen_batches: 2
+
+custom_reward_function:
+  path: ${oc.env:HX_ROOT}/recipe/verl/reward.py
+  name: compute_score
+
+trainer:
+  n_gpus_per_node: 8
+  nnodes: 1
+  total_epochs: 5
+  save_freq: 10
+  test_freq: 10
+  val_before_train: False
+  val_only: False
+  critic_warmup: 0
+  project_name: harnessx_grpo
+  experiment_name: harnessx_research
+  default_local_dir: ${oc.env:CKPT_DIR}
+  logger:
+    - console
+  rollout_data_dir: ${oc.env:CKPT_DIR}/rollout_saved
+  validation_data_dir: ${oc.env:CKPT_DIR}/val_saved
