@@ -180,7 +180,7 @@ def main() -> None:
         "--api-base",
         required=True,
         metavar="URL",
-        help="API base URL (e.g. https://api.anthropic.com, http://127.0.0.1:8061/v1)",
+        help="API base URL supplied by the user",
     )
     parser.add_argument(
         "--extra-headers",
@@ -256,21 +256,20 @@ def main() -> None:
     parser.add_argument(
         "--sandbox-url",
         default=None,
-        help="OpenSandbox server URL (only used with --env opensandbox, e.g. http://127.0.0.1:13081).",
+        help="OpenSandbox server URL supplied by the user (only used with --env opensandbox).",
     )
     parser.add_argument(
         "--proxy-url",
         default=None,
         help="HTTP proxy injected into every sandbox exec() call "
-        "(only used with --env opensandbox, "
-        "e.g. http://10.88.0.1:7898).",
+        "(only used with --env opensandbox). Supply the proxy URL at runtime, not in source control.",
     )
     parser.add_argument(
         "--no-proxy",
         default=None,
         help="Comma-separated list of hosts/IPs that bypass the proxy "
         "(injected as no_proxy/NO_PROXY, only used with --env opensandbox, "
-        "e.g. '127.0.0.1,10.53.91.141').",
+        "e.g. '127.0.0.1,localhost,<your-host-or-domain>').",
     )
     parser.add_argument(
         "--verifier-timeout-multiplier",

@@ -106,7 +106,7 @@ def check_sglang(url: str | None = None) -> bool:
 
 
 def check_megatron() -> bool:
-    megatron = os.environ.get("MEGATRON_ROOT", "/root/Megatron-LM")
+    megatron = os.environ.get("MEGATRON_ROOT", os.path.expanduser("~/Megatron-LM"))
     if os.path.isdir(megatron):
         logger.info("  Megatron-LM OK — %s", megatron)
         return True

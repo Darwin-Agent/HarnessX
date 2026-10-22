@@ -25,7 +25,7 @@ from pathlib import Path
 
 # Use cached HF datasets
 os.environ.pop("HF_DATASETS_OFFLINE", None)
-os.environ.setdefault("OPENAI_API_KEY", os.environ.get("ANTHROPIC_API_KEY", "sk-placeholder"))
+os.environ.setdefault("OPENAI_API_KEY", os.environ.get("ANTHROPIC_API_KEY", "test-key-placeholder"))
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 

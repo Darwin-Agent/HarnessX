@@ -24,6 +24,9 @@ Search results include source URLs and excerpts; fetching returns excerpts focus
 on the same objective. Each invocation shares one anonymous session identifier
 across both tools.
 
+The default endpoint is `https://search.parallel.ai/mcp`. Set `MCP_SEARCH_URL`
+only when you want to override it; no environment variables are required.
+
 This example calls tools directly, so it needs no model credentials. It does not
 change built-in search tools, model settings, or saved MCP server configuration.
 To use the discovered tools in your own agent, register `registry.tools()` in its

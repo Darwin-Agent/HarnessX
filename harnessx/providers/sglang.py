@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import time
 import uuid
@@ -167,6 +168,20 @@ class SGLangProvider:
         truncation_head_ratio: float = 0.3,
         # Fraction of budget allocated to the head portion when
         # truncation_strategy="head_tail".  Default 0.3 matches terminal-rl.
+        tool_call_format: str = "json",
+        # Format of tool calls in model output.
+        # "json": <tool_call>{"name":..., "arguments":{...}}</tool_call>
+        #         (Qwen3 native apply_chat_template output)
+        # "qwen3_coder": <tool_call><function=name>{...}</function></tool_call>
+        #         (qwen3_coder SFT format)
+        tool_result_role: str = "tool",
+        # Role for tool result messages in the conversation history.
+        # "tool": standard (Message with role="tool" + tool_call_id)
+        # "user": wrap as user message (for qwen3_coder format compatibility)
+        strip_think_prefix: bool = False,
+        # If True, strip trailing <think>\n tokens from generation prompt
+        # so the model must generate <think> by itself.
+        require_logprobs: bool = False,
     ) -> None:
         self.url = url
         self.tokenizer = tokenizer
@@ -177,6 +192,19 @@ class SGLangProvider:
         self._chat_template_kwargs: dict = dict(chat_template_kwargs or {})
         self._truncation_strategy = truncation_strategy
         self._truncation_head_ratio = truncation_head_ratio
+        if tool_call_format not in {"json", "qwen3_coder"}:
+            raise ValueError(f"Unsupported tool_call_format: {tool_call_format}")
+        if tool_result_role not in {"tool", "user"}:
+            raise ValueError(f"Unsupported tool_result_role: {tool_result_role}")
+        self._strip_think_prefix = strip_think_prefix
+        self._tool_call_format = tool_call_format
+        self.tool_result_role = tool_result_role
+        self.require_logprobs = require_logprobs
+
+        # Stop strings: SGLang terminates generation when this string is detected
+        # in the output token stream. The model generates </tool_call> as character
+        # tokens (not the special token 248059), so we use string-based stop.
+        self._stop_strings: list[str] = ["</tool_call>"]
 
         self.step_captures: list[StepCapture] = []
         self.truncated: bool = False
@@ -216,6 +244,13 @@ class SGLangProvider:
             self._http_client = None
 
     # ── Input truncation ──────────────────────────────────────────────────────
+
+    def _strip_generation_prefix(self, input_ids: list[int]) -> list[int]:
+        if self._strip_think_prefix:
+            prefix_ids = self.tokenizer.encode("<think>\n", add_special_tokens=False)
+            if prefix_ids and input_ids[-len(prefix_ids) :] == prefix_ids:
+                return input_ids[: -len(prefix_ids)]
+        return input_ids
 
     def _truncate_input_ids(self, input_ids: list[int]) -> list[int]:
         """Truncate input_ids using head/tail strategy when they exceed the budget.
@@ -291,8 +326,10 @@ class SGLangProvider:
                     tools=tool_dicts,
                     add_generation_prompt=True,
                     tokenize=True,
+                    return_dict=False,
                     **self._chat_template_kwargs,
                 )
+                input_ids = self._strip_generation_prefix(input_ids)
         else:
             # ── Step t+1: incremental tokenization ───────────────────────────
             prev_cap = self.step_captures[-1]
@@ -317,8 +354,10 @@ class SGLangProvider:
                     tools=tool_dicts,
                     add_generation_prompt=True,
                     tokenize=True,
+                    return_dict=False,
                     **self._chat_template_kwargs,
                 )
+                fresh_ids = self._strip_generation_prefix(fresh_ids)
                 if len(fresh_ids) >= len(known_prefix):
                     input_ids = known_prefix + fresh_ids[len(known_prefix) :]
                 else:
@@ -365,11 +404,21 @@ class SGLangProvider:
             **self.sampling_params,
             "max_new_tokens": dynamic_max_new_tokens,
         }
+        if self._stop_strings:
+            existing_stops = _sampling_params.get("stop", []) or []
+            if isinstance(existing_stops, str):
+                existing_stops = [existing_stops]
+            _sampling_params["stop"] = list(dict.fromkeys([*existing_stops, *self._stop_strings]))
+            _sampling_params["no_stop_trim"] = True
         payload = {
             "input_ids": input_ids,
             "sampling_params": _sampling_params,
             "return_logprob": True,
         }
+        # Multimodal: extract image data from messages for SGLang vision models
+        image_data = _extract_image_data(messages)
+        if image_data:
+            payload["image_data"] = image_data
         t_infer = time.monotonic()
         if self._post_fn is not None:
             output: dict = await self._post_fn(self.url, payload)
@@ -385,6 +434,24 @@ class SGLangProvider:
 
         # 6. Extract token IDs and logprobs from output_token_logprobs
         output_token_logprobs = output.get("meta_info", {}).get("output_token_logprobs")
+        if self.require_logprobs:
+            try:
+                if not output_token_logprobs or any(
+                    item[0] is None
+                    or not math.isfinite(float(item[0]))
+                    or float(item[0]) > 0
+                    or not isinstance(item[1], int)
+                    or item[1] < 0
+                    for item in output_token_logprobs
+                ):
+                    raise ValueError("Missing or invalid token probabilities")
+                if "output_ids" in output and output["output_ids"] != [item[1] for item in output_token_logprobs]:
+                    raise ValueError("Token probabilities do not match generated token IDs")
+            except (TypeError, ValueError, IndexError, KeyError) as error:
+                self.aborted = True
+                raise GenerationAborted(
+                    "Training rollout requires aligned log probabilities for every generated token"
+                ) from error
         if output_token_logprobs:
             output_token_ids: list[int] = [item[1] for item in output_token_logprobs]
             # Guard against None logprob values that SGLang occasionally emits for
@@ -403,8 +470,12 @@ class SGLangProvider:
         # 7. Decode text from output token IDs
         text: str = self.tokenizer.decode(output_token_ids, skip_special_tokens=False)
 
-        # 8. Parse <tool_call> XML blocks from text (Qwen3 XML format)
-        tool_calls: list[ToolCall] = _parse_qwen3_tool_calls(text)
+        # 7b. With stop=["</tool_call>"] + no_stop_trim=True, SGLang stops
+        # generation at the stop string and includes it in the output tokens.
+        # No post-processing needed.
+
+        # 8. Parse <tool_call> XML blocks from text
+        tool_calls: list[ToolCall] = _parse_qwen3_tool_calls(text, self._tool_call_format)
 
         # 9. Build Usage from token counts
         usage = Usage(
@@ -525,6 +596,28 @@ def _messages_to_openai_dicts(messages: list[Message]) -> list[dict]:
     return result
 
 
+def _extract_image_data(messages: list[Message]) -> list[str] | None:
+    """Extract base64 image data from multimodal messages for SGLang.
+
+    SGLang accepts image_data as a list of base64-encoded strings (one per
+    image in the conversation). Returns None if no images are present.
+    """
+    images: list[str] = []
+    for m in messages:
+        if not isinstance(m.content, list):
+            continue
+        for block in m.content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "image":
+                source = block.get("source", {})
+                if source.get("type") == "base64" and source.get("data"):
+                    media_type = source.get("media_type", "image/png")
+                    b64 = source["data"]
+                    images.append(f"data:{media_type};base64,{b64}")
+    return images if images else None
+
+
 def _schemas_to_openai_tools(tools: list[ToolSchema]) -> list[dict]:
     """Convert ToolSchema list to OpenAI function-calling format."""
     return [
@@ -544,11 +637,70 @@ def _schemas_to_openai_tools(tools: list[ToolSchema]) -> list[dict]:
 # Tool call XML parsing (Qwen3 format)
 # ---------------------------------------------------------------------------
 
+# Regex for qwen3_coder format: <tool_call><function=name>{...}</function></tool_call>
+_QWEN3_CODER_RE = re.compile(
+    r"<tool_call>\s*<function=(\w+)>(.*?)</function>\s*</tool_call>",
+    re.DOTALL,
+)
 
-def _parse_qwen3_tool_calls(text: str) -> list[ToolCall]:
+
+_QWEN3_CODER_PARAM_RE = re.compile(
+    r"<parameter=(\w+)>\s*(.*?)\s*</parameter>",
+    re.DOTALL,
+)
+
+
+def _parse_qwen3_coder_xml_params(args_str: str) -> dict:
+    """Parse XML parameter format: <parameter=name>value</parameter>."""
+    args: dict = {}
+    for pm in _QWEN3_CODER_PARAM_RE.finditer(args_str):
+        param_name = pm.group(1)
+        param_value = pm.group(2).strip()
+        # Try to parse as JSON value (number, bool, list, dict)
+        try:
+            args[param_name] = json.loads(param_value)
+        except (json.JSONDecodeError, ValueError):
+            args[param_name] = param_value
+    return args
+
+
+def _parse_qwen3_coder_tool_calls(text: str) -> list[ToolCall]:
+    """Parse <tool_call><function=name>...</function></tool_call> blocks.
+
+    qwen3_coder format — supports two argument styles:
+      1. JSON: <function=name>{"key": "value"}</function>
+      2. XML parameters: <function=name><parameter=key>value</parameter></function>
+         (Qwen3.5 chat template generates this format)
+    """
+    results: list[ToolCall] = []
+    for m in _QWEN3_CODER_RE.finditer(text):
+        name = m.group(1)
+        args_str = m.group(2).strip()
+        args: dict = {}
+        if args_str:
+            # Try JSON first (original path)
+            try:
+                args = json.loads(args_str)
+            except json.JSONDecodeError:
+                try:
+                    args = json.loads(args_str.replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n"))
+                except json.JSONDecodeError:
+                    # Fallback: parse XML <parameter=name>value</parameter> format
+                    args = _parse_qwen3_coder_xml_params(args_str)
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                args = {}
+        if name:
+            results.append(ToolCall(id=str(uuid.uuid4()), name=name, input=args))
+    return results
+
+
+def _parse_qwen3_json_tool_calls(text: str) -> list[ToolCall]:
     """Parse <tool_call>{"name":..., "arguments":{...}}</tool_call> blocks.
 
-    Qwen3 XML tool call format (NOT OpenAI API native function calling).
+    Qwen3 native JSON format (produced by apply_chat_template with tools).
 
     Two-pass JSON parsing to handle both common model output patterns:
       Pass 1 — json.loads(raw): handles valid JSON including structural newlines
@@ -601,6 +753,18 @@ def _parse_qwen3_tool_calls(text: str) -> list[ToolCall]:
             pass
 
     return results
+
+
+def _parse_qwen3_tool_calls(text: str, tool_call_format: str = "json") -> list[ToolCall]:
+    """Dispatch to the appropriate tool call parser based on format.
+
+    Args:
+        text:             Model-generated text to parse.
+        tool_call_format: "json" (default) or "qwen3_coder".
+    """
+    if tool_call_format == "qwen3_coder":
+        return _parse_qwen3_coder_tool_calls(text)
+    return _parse_qwen3_json_tool_calls(text)
 
 
 # ---------------------------------------------------------------------------
@@ -662,6 +826,8 @@ def build_flat_sequence(provider: SGLangProvider) -> FlatSequence:
             # tokenization in complete().  A violation here means something outside
             # the provider mutated the message sequence (e.g. compaction processor).
             if len(next_ids) < base_len:
+                if getattr(provider, "require_logprobs", False):
+                    raise ValueError("Training rollout context was shortened between turns")
                 logger.error(
                     "Flat sequence invariant broken at step %d: "
                     "next input_ids (%d) shorter than input+output (%d). "
@@ -675,6 +841,8 @@ def build_flat_sequence(provider: SGLangProvider) -> FlatSequence:
                 expected_prefix = cap.input_ids + cap.output_token_ids
                 actual_prefix = next_ids[:base_len]
                 if expected_prefix != actual_prefix:
+                    if getattr(provider, "require_logprobs", False):
+                        raise ValueError("Training rollout token prefix changed between turns")
                     logger.error(
                         "Flat sequence prefix mismatch at step %d "
                         "(first divergence near token %d). "
@@ -690,6 +858,14 @@ def build_flat_sequence(provider: SGLangProvider) -> FlatSequence:
 
     if not (len(resp) == len(mask) == len(logps)):
         raise RuntimeError(f"FlatSequence length mismatch: {len(resp)} resp / {len(mask)} mask / {len(logps)} logps")
+
+    logger.debug(
+        "Rollout steps=%d prompt_tokens=%d response_tokens=%d trainable_tokens=%d",
+        len(caps),
+        len(prompt_ids),
+        len(resp),
+        sum(mask),
+    )
 
     return FlatSequence(
         prompt_ids=prompt_ids,

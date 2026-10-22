@@ -98,7 +98,7 @@ class ModelConfig:
                 provider: anthropic
                 _target_: harnessx.providers.anthropic_provider.AnthropicProvider
                 model: claude-sonnet-4-6
-                api_key: sk-ant-...
+                api_key: <your-api-key>
             roles:
               main:
                 default: claude-sonnet-4-6

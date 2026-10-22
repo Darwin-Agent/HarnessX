@@ -3,6 +3,12 @@ import { useUIStore } from '../store/ui'
 type Dict = Record<string, string>
 
 const en: Dict = {
+  'docs.title': 'Documentation',
+  'docs.overview': 'Overview',
+  'docs.lab': 'HarnessX Harness Lab',
+  'docs.gateway': 'Gateway Docs',
+  'docs.gateway_product': 'HarnessX IM Gateway',
+  'docs.open': 'Open documentation',
   // ── Navigation ──────────────────────────────────────────────
   'nav.builder':  'Builder',
   'nav.compare':  'Compare',
@@ -35,6 +41,10 @@ const en: Dict = {
   'builder.copy_example_to_custom': 'Copy Current Example To Custom (Editable)',
   'builder.start_chat':    'Start Chatting →',
   'builder.loading_dims':  'Loading dimensions…',
+  'builder.save.success':  'Configuration saved to',
+  'builder.save.error':    'Failed to save configuration',
+  'builder.history.readonly': 'History · {id}… · Read-only',
+  'builder.history.resume': 'Resume conversation →',
 
   // ── Status ───────────────────────────────────────────────────
   'status.idle':    'Idle',
@@ -179,6 +189,11 @@ const en: Dict = {
   'settings.page.tools':     'Tools',
   'settings.page.skills':    'Skills',
   'settings.page.plugins':   'Plugins',
+  'settings.page.workspace.desc': 'Set up your local workspace directory and browse files.',
+  'settings.page.tools.desc': 'Enable or disable built-in tools and configure MCP servers.',
+  'settings.page.skills.desc': 'Manage built-in skills that are auto-injected into each step.',
+  'settings.page.plugins.desc': 'Discover, enable, and manage installed plugins.',
+  'settings.page.model.desc': 'Configure model providers, API keys, and endpoints. Assign models to named slots. Supports YAML import/export.',
 
   // ── MCP ───────────────────────────────────────────────────────
   'mcp.section':         'MCP Servers',
@@ -228,6 +243,12 @@ const en: Dict = {
 }
 
 const zh: Dict = {
+  'docs.title': '文档',
+  'docs.overview': '概览',
+  'docs.lab': 'HarnessX 实验室',
+  'docs.gateway': '网关文档',
+  'docs.gateway_product': 'HarnessX 即时通信网关',
+  'docs.open': '打开文档',
   // ── Navigation ──────────────────────────────────────────────
   'nav.builder':  '构建器',
   'nav.compare':  '对比',
@@ -260,6 +281,10 @@ const zh: Dict = {
   'builder.copy_example_to_custom': '复制当前示例到自定义（可编辑）',
   'builder.start_chat':    '开始对话 →',
   'builder.loading_dims':  '正在加载维度…',
+  'builder.save.success':  '配置已保存到',
+  'builder.save.error':    '配置保存失败',
+  'builder.history.readonly': '历史对话 · {id}… · 只读',
+  'builder.history.resume': '续接此对话 →',
 
   // ── Status ───────────────────────────────────────────────────
   'status.idle':    '空闲',
@@ -404,6 +429,11 @@ const zh: Dict = {
   'settings.page.tools':     '工具',
   'settings.page.skills':    '技能',
   'settings.page.plugins':   '插件',
+  'settings.page.workspace.desc': '设置本地工作区目录并浏览文件。',
+  'settings.page.tools.desc': '启用或停用内置工具，并配置 MCP 服务。',
+  'settings.page.skills.desc': '管理会自动注入到每个步骤中的内置技能。',
+  'settings.page.plugins.desc': '发现、启用和管理已安装的插件。',
+  'settings.page.model.desc': '配置模型服务商、API 密钥和 endpoint，并将模型分配到命名插槽。支持导入和导出 YAML。',
 
   // ── MCP ───────────────────────────────────────────────────────
   'mcp.section':         'MCP 服务',

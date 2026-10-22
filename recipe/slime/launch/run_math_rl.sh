@@ -18,13 +18,12 @@
 # Usage:
 #   bash recipe/slime/launch/run_rl.sh
 
-# Kill stale processes (identical to retool)
-pkill -9 sglang 2>/dev/null; sleep 3
-ray stop --force 2>/dev/null
-pkill -9 ray 2>/dev/null; pkill -9 python 2>/dev/null; sleep 3
-pkill -9 ray 2>/dev/null; pkill -9 python 2>/dev/null
+set -e
 
-set -ex
+if [[ "${STOP_EXISTING_SERVICES:-0}" == "1" ]]; then
+    ray stop --force
+    unset RAY_ADDRESS
+fi
 
 # keep stdout/stderr unbuffered in ray jobs
 export PYTHONUNBUFFERED=1
@@ -58,7 +57,7 @@ MEGATRON_ROOT="${MEGATRON_ROOT:?MEGATRON_ROOT env var is required}"
 DATA_ROOT="${DATA_ROOT:?DATA_ROOT env var is required}"
 export HF_HOME="${DATA_ROOT}/hf_cache"
 export HF_HUB_ENABLE_HF_TRANSFER=1
-export HF_ENDPOINT="https://hf-mirror.com"
+export HF_ENDPOINT="${HF_ENDPOINT:-https://huggingface.co}"
 CKPT_ROOT="${DATA_ROOT}/harnessx_slime/ckpt"
 
 # NVLink detection (identical to retool)
@@ -211,38 +210,36 @@ CUSTOM_ARGS=(
 export PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF:-"max_split_size_mb:2048,expandable_segments:True"}
 
 export MASTER_ADDR="${MASTER_ADDR:-127.0.0.1}"
-export no_proxy="127.0.0.1,${MASTER_ADDR}"
+export no_proxy="127.0.0.1,localhost,${MASTER_ADDR}${no_proxy:+,${no_proxy}}"
 
 # Collect all local IPs so Ray workers can bypass proxy for intra-node traffic
-# (SGLang servers bind to the actual host IP, not 127.0.0.1)
+# SGLang servers may bind to additional host addresses; add them at runtime.
 LOCAL_IPS=$(hostname -I 2>/dev/null | tr ' ' ',' | sed 's/,$//')
-NO_PROXY_LIST="127.0.0.1,localhost,${MASTER_ADDR}${LOCAL_IPS:+,${LOCAL_IPS}}"
+NO_PROXY_LIST="${no_proxy}${LOCAL_IPS:+,${LOCAL_IPS}}${NO_PROXY:+,${NO_PROXY}}"
+export no_proxy="${NO_PROXY_LIST}"
+export NO_PROXY="${NO_PROXY_LIST}"
 echo "no_proxy for Ray workers: ${NO_PROXY_LIST}"
 
 ray start --head \
     --node-ip-address "${MASTER_ADDR}" \
     --num-gpus ${NUM_GPUS} \
     --disable-usage-stats \
-    --dashboard-host=0.0.0.0 \
-    --dashboard-port=8265
+    --dashboard-host="${RAY_DASHBOARD_HOST:-localhost}" \
+    --dashboard-port="${RAY_DASHBOARD_PORT:-8265}"
 
-RUNTIME_ENV_JSON="{
-  \"env_vars\": {
-    \"PYTHONPATH\": \"${MEGATRON_ROOT}:${SLIME_ROOT}:${HX_ROOT}\",
-    \"HF_HOME\": \"${DATA_ROOT}/hf_cache\",
-    \"HF_HUB_ENABLE_HF_TRANSFER\": \"1\",
-    \"HF_ENDPOINT\": \"https://hf-mirror.com\",
-    \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
-    \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\",
-    \"PYTORCH_CUDA_ALLOC_CONF\": \"${PYTORCH_CUDA_ALLOC_CONF}\",
-    \"no_proxy\": \"${NO_PROXY_LIST}\",
-    \"NO_PROXY\": \"${NO_PROXY_LIST}\",
-    \"KEEP_LAST_CKPTS\": \"${KEEP_LAST_CKPTS}\",
-    \"HARNESSX_SAMPLE_TIMEOUT\": \"${HARNESSX_SAMPLE_TIMEOUT}\"
-  }
-}"
+RUNTIME_ENV_JSON=$(python3 "${HX_ROOT}/recipe/slime/launch/runtime_environment.py" \
+    --env "PYTHONPATH=${MEGATRON_ROOT}:${SLIME_ROOT}:${HX_ROOT}" \
+    --env "HF_HOME=${DATA_ROOT}/hf_cache" \
+    --env "HF_HUB_ENABLE_HF_TRANSFER=1" \
+    --env "HF_ENDPOINT=${HF_ENDPOINT}" \
+    --env "CUDA_DEVICE_MAX_CONNECTIONS=1" \
+    --env "NCCL_NVLS_ENABLE=${HAS_NVLINK}" \
+    --env "PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF}" \
+    --env "no_proxy=${NO_PROXY_LIST}" --env "NO_PROXY=${NO_PROXY_LIST}" \
+    --env "KEEP_LAST_CKPTS=${KEEP_LAST_CKPTS}" \
+    --env "HARNESSX_SAMPLE_TIMEOUT=${HARNESSX_SAMPLE_TIMEOUT}")
 
-ray job submit --address="http://127.0.0.1:8265" \
+ray job submit --address="http://${RAY_SUBMIT_HOST:-127.0.0.1}:${RAY_DASHBOARD_PORT:-8265}" \
     --runtime-env-json="${RUNTIME_ENV_JSON}" \
     -- python3 "${SLIME_ROOT}/train_async.py" \
         --actor-num-nodes         1 \

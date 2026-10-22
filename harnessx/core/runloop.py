@@ -157,6 +157,11 @@ async def run_loop(
         specific = processors.get(key)
         return _star_procs + specific if specific else _star_procs
 
+    # Tool result role: "tool" (standard) or "user" (qwen3_coder compat).
+    # Read from model_provider if set; defaults to "tool" for backward compat.
+    _tool_result_role: str = getattr(model_provider, "tool_result_role", "tool")
+    _wrap_tool_response: bool = _tool_result_role == "user"
+
     # Pull pending command side-channels out of state before processors run.
     # Both are plain attributes set by Harness.run() (not StateSlot objects).
     _cmd_prompt_prefix = getattr(state, "_pending_command_prompt", None) or ""
@@ -526,6 +531,19 @@ async def run_loop(
                 try:
                     from ..tools.spawn_subagent import _spawn_ctx
 
+                    _provider_info = None
+                    if hasattr(model_provider, "step_captures"):
+                        _provider_info = {
+                            "url": getattr(model_provider, "url", ""),
+                            "tokenizer": getattr(model_provider, "tokenizer", None),
+                            "sampling_params": getattr(model_provider, "sampling_params", {}),
+                            "rollout_max_context_len": getattr(model_provider, "rollout_max_context_len", 32768),
+                            "post_fn": getattr(model_provider, "_post_fn", None),
+                            "tool_call_format": getattr(model_provider, "_tool_call_format", "json"),
+                            "tool_result_role": getattr(model_provider, "tool_result_role", "tool"),
+                            "strip_think_prefix": getattr(model_provider, "_strip_think_prefix", False),
+                            "require_logprobs": getattr(model_provider, "require_logprobs", False),
+                        }
                     _spawn_ctx_token = _spawn_ctx.set(
                         {
                             "run_id": state.run_id,
@@ -536,6 +554,7 @@ async def run_loop(
                             "model_config": model_config,
                             "harness_config": harness_config,
                             "child_harness_config": child_harness_config,
+                            "provider_info": _provider_info,
                         }
                     )
                 except ImportError:
@@ -582,6 +601,8 @@ async def run_loop(
                         step_tool_results.append(tr_event)
 
                         result_text = tr_event.result if not tr_event.error else f"Error: {tr_event.error}"
+                        if isinstance(result_text, str):
+                            result_text = result_text.strip()
                         if tr_event.content_blocks:
                             result_content: str | list = [
                                 {"type": "text", "text": result_text},
@@ -589,11 +610,13 @@ async def run_loop(
                             ]
                         else:
                             result_content = result_text
+                        if _wrap_tool_response and isinstance(result_content, str):
+                            result_content = f"<tool_response>\n{result_content}\n</tool_response>"
                         state.add_raw_message(
                             Message(
-                                role="tool",
+                                role=_tool_result_role,
                                 content=result_content,
-                                tool_call_id=tc_event.tool_call_id,
+                                tool_call_id=tc_event.tool_call_id if _tool_result_role == "tool" else None,
                                 name=tc_event.tool_name,
                             )
                         )
@@ -619,20 +642,28 @@ async def run_loop(
                         await tracer.on_event(tr_event)
                         state.add_tool_result(tr_event)
                         step_tool_results.append(tr_event)
+                        _syn_text = tr_event.result if not tr_event.error else f"Error: {tr_event.error}"
+                        if isinstance(_syn_text, str):
+                            _syn_text = _syn_text.strip()
+                        if _wrap_tool_response:
+                            _syn_text = f"<tool_response>\n{_syn_text}\n</tool_response>"
                         state.add_raw_message(
                             Message(
-                                role="tool",
-                                content=tr_event.result if not tr_event.error else f"Error: {tr_event.error}",
-                                tool_call_id=tc_event.tool_call_id,
+                                role=_tool_result_role,
+                                content=_syn_text,
+                                tool_call_id=tc_event.tool_call_id if _tool_result_role == "tool" else None,
                                 name=tc_event.tool_name,
                             )
                         )
                     else:
+                        _not_approved = "Tool call not approved."
+                        if _wrap_tool_response:
+                            _not_approved = f"<tool_response>\n{_not_approved}\n</tool_response>"
                         state.add_raw_message(
                             Message(
-                                role="tool",
-                                content="Tool call not approved.",
-                                tool_call_id=tc_event.tool_call_id,
+                                role=_tool_result_role,
+                                content=_not_approved,
+                                tool_call_id=tc_event.tool_call_id if _tool_result_role == "tool" else None,
                                 name=tc_event.tool_name,
                             )
                         )

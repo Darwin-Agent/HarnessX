@@ -430,10 +430,10 @@ async def reward_func(args: Any, sample: Sample, **kwargs: Any) -> dict:
         "exit_reason": exit_reason,
         "trajectory_quality": trajectory_quality,
         # ── Correctness diagnostics (for PG loss debugging) ──────────────────
-        # is_correct: 1 if terminal >= 0, 0 otherwise — for pass@k estimation
+        # is_correct follows the evaluator result, independent of reward shaping.
         # When is_correct is near 0 across all n_samples_per_prompt, the GRPO
         # advantage is ~0 (all scores similar), which explains PG loss ≈ 0.
-        "is_correct": int(terminal >= 0),
+        "is_correct": int(eval_result is not None and eval_result.passed),
         # ── Timing diagnostics (ms) ────────────────────────────────────────
         "harness_run_ms": metadata.get("harness_run_ms", 0.0),
         "sample_fill_ms": metadata.get("sample_fill_ms", 0.0),

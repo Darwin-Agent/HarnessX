@@ -120,7 +120,7 @@ Four sandbox backends are supported:
 | **Modal** | yes | Managed cloud; suited for internet-dependent tasks |
 
 For Local Docker, Daytona, Modal setup and the recommended Modal+Daytona split-backend
-parallel run, see [`scripts/README.md`](scripts/README.md).
+parallel run, see the scripts under [`scripts/`](scripts/).
 
 ---
 
@@ -129,7 +129,7 @@ parallel run, see [`scripts/README.md`](scripts/README.md).
 Set credentials and the sandbox URL:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 export OPENSANDBOX_URL=http://your-server:13081
 ```
 

@@ -80,6 +80,8 @@ export function ModelSheet() {
             <button
               key={l}
               onClick={() => setLang(l)}
+              aria-label={l === 'en' ? 'Switch language to English' : '切换语言为中文'}
+              aria-pressed={lang === l}
               className="px-2 py-1 rounded-md transition-all duration-150 font-medium"
               style={{
                 fontSize: '12px',
@@ -88,7 +90,7 @@ export function ModelSheet() {
                 fontFamily: l === 'zh' ? 'system-ui, sans-serif' : 'JetBrains Mono, monospace',
               }}
             >
-              {l === 'en' ? 'EN' : '中'}
+              {l === 'en' ? 'EN' : '中文'}
             </button>
           ))}
         </div>
@@ -110,12 +112,10 @@ export function ModelSheet() {
         <div className="px-8 py-7 max-w-4xl">
           <div className="mb-7">
             <h1 className="font-bold" style={{ fontSize: '22px', color: 'var(--text-1)', letterSpacing: '-0.03em' }}>
-              {lang === 'zh' ? '模型' : 'Model'}
+              {t('settings.page.model')}
             </h1>
             <p className="mt-1.5" style={{ fontSize: '14px', color: 'var(--text-3)', lineHeight: 1.6 }}>
-              {lang === 'zh'
-                ? '配置模型提供商、API 密钥和端点，并将模型分配到命名插槽。支持导入/导出 YAML。'
-                : 'Configure model providers, API keys, and endpoints. Assign models to named slots. Supports YAML import/export.'}
+              {t('settings.page.model.desc')}
             </p>
           </div>
           <ModelPage />
