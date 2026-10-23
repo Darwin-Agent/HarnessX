@@ -155,9 +155,7 @@ class HarnessXAgentLoop(AgentLoopBase):
             response_ids = tokens[-response_length:]
             logprobs = _validate_tokens(prompt_ids, response_ids, episode["loss_mask"], episode["rollout_log_probs"])
             self._validate_prompt_length(prompt_ids)
-            response_ids, response_mask, logprobs = self._bounded_response(
-                response_ids, episode["loss_mask"], logprobs
-            )
+            response_ids, response_mask, logprobs = self._bounded_response(response_ids, episode["loss_mask"], logprobs)
             sub_outputs = []
             for child in sub_episodes:
                 child_prompt = child["prompt_ids"]

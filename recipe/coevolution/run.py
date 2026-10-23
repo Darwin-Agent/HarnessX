@@ -207,7 +207,7 @@ async def _alternate(settings: Settings, backend, *, resume=False) -> dict:
         if not buffer_path.is_file():
             raise FileNotFoundError(f"Trajectory collection did not create its buffer: {buffer_path}")
         exploration_dir = work / "exploration"
-        async with backend.search(model, work / "aegis"):
+        async with backend.search(model, work):
             proposal = await backend.propose(model, exploration_harness, exploration_dir, work / "proposal", index)
             try:
                 candidate = HarnessConfig.from_yaml_file(proposal)

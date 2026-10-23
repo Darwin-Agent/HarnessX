@@ -537,9 +537,7 @@ async def run_loop(
                             "url": getattr(active_model_provider, "url", ""),
                             "tokenizer": getattr(active_model_provider, "tokenizer", None),
                             "sampling_params": getattr(active_model_provider, "sampling_params", {}),
-                            "rollout_max_context_len": getattr(
-                                active_model_provider, "rollout_max_context_len", 32768
-                            ),
+                            "rollout_max_context_len": getattr(active_model_provider, "rollout_max_context_len", 32768),
                             "post_fn": getattr(active_model_provider, "_post_fn", None),
                             "tool_call_format": getattr(active_model_provider, "_tool_call_format", "json"),
                             "tool_result_role": getattr(active_model_provider, "tool_result_role", "tool"),
