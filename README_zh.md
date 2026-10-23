@@ -197,6 +197,20 @@ HarnessX 提供两个进化循环，可在任意基准测试上系统性地提�
 
 ---
 
+<a id="co-evo-branch-zh"></a>
+## 🔗 Co-Evolution 分支
+
+本仓库还维护一个独立的 **`co-evo`** 分支，集中承载 Harness 与模型的联合进化实现，包括 co-evolution recipes、VERL 接入、相关测试与文档。
+
+- 分支代码：https://github.com/Darwin-Agent/HarnessX/tree/co-evo
+- 分支列表：https://github.com/Darwin-Agent/HarnessX/branches
+- 对比 Pull Request：https://github.com/Darwin-Agent/HarnessX/pull/21
+
+> 该分支保持独立演进，请根据实验需求切换或拉取：
+> `git fetch origin && git checkout co-evo`
+
+---
+
 <a id="structure"></a>
 ## 📁 项目结构
 
