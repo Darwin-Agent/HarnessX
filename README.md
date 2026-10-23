@@ -198,6 +198,20 @@ When the two loops run together, the gains compound: harness evolution lifts the
 
 ---
 
+<a id="co-evo-branch-en"></a>
+## 🔗 Co-Evolution Branch
+
+This repository also maintains a separate **`co-evo`** branch for Harness-model co-evolution, including co-evolution recipes, VERL integration, related tests, and documentation.
+
+- Branch code: https://github.com/Darwin-Agent/HarnessX/tree/co-evo
+- Branch list: https://github.com/Darwin-Agent/HarnessX/branches
+- Compare Pull Request: https://github.com/Darwin-Agent/HarnessX/pull/21
+
+> The branch evolves independently. To check it out:
+> `git fetch origin && git checkout co-evo`
+
+---
+
 <a id="structure"></a>
 ## 📁 Project Structure
 
