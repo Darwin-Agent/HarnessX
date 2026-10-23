@@ -135,6 +135,7 @@ class BeforeModelEvent(Event):
     cumulative_cost_usd: float = 0.0  # needed by CostGuardProcessor
     skip_model: bool = field(default=False, hash=False, compare=False)
     synthetic_output: str = field(default="", hash=False, compare=False)
+    persistent_messages: tuple[Message, ...] = field(default=(), hash=False, compare=False)
 
 
 @dataclass(frozen=True)

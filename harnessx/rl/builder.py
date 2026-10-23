@@ -77,13 +77,14 @@ def build_rl_harness_config(
         2. spec.system_prompt              — task-type default
         3. None                            — NullSystemPromptBuilder (empty)
 
-    Composes via HarnessBuilder:
-        - step_snapshots=False + NullTracer (no snapshots, no tracing overhead)
-        - SystemPromptProcessor (fixed or null builder)
-        - TokenBudgetProcessor(ratio=1.0) as hard safety window guard
-        - RLControlPlugin (RLSignalCollectorProcessor + EpisodeMetricsProcessor)
-        - EvaluationProcessor(evaluator)
-        - extra_processors from spec (per hook, appended last)
+    Processor pipeline:
+        If spec.processors is non-empty, uses that list directly (full control).
+        Otherwise uses the default pipeline:
+            - SystemPromptProcessor (fixed or null builder)
+            - TokenBudgetProcessor(ratio=1.0) as hard safety window guard
+            - RLControlPlugin (RLSignalCollectorProcessor + EpisodeMetricsProcessor)
+            - EvaluationProcessor(evaluator)
+        In both cases, extra_processors are appended last.
 
     Args:
         spec:     RLConfigSpec (or subclass) with task configuration.
@@ -96,14 +97,22 @@ def build_rl_harness_config(
     evaluator = spec.evaluator_cls(task)
     system_builder = _resolve_system_builder(spec, task)
 
-    builder = (
-        HarnessBuilder()
-        .slot(step_snapshots=False, tracer=NullTracer())
-        .add(SystemPromptProcessor(system_builder))
-        .add(TokenBudgetProcessor(ratio=1.0))
-        .plugin(RLControlPlugin())
-        .add(EvaluationProcessor(evaluator))
-    )
+    builder = HarnessBuilder().slot(step_snapshots=False, tracer=NullTracer())
+
+    processor_factory = getattr(spec, "processor_factory", None)
+    if processor_factory:
+        for proc in processor_factory(system_builder, evaluator):
+            proc.__hx_runtime_only__ = True
+            builder = builder.add(proc)
+    else:
+        evaluation_processor = EvaluationProcessor(evaluator)
+        evaluation_processor.__hx_runtime_only__ = True
+        builder = (
+            builder.add(SystemPromptProcessor(system_builder))
+            .add(TokenBudgetProcessor(ratio=1.0))
+            .plugin(RLControlPlugin())
+            .add(evaluation_processor)
+        )
 
     for hook, procs in (spec.extra_processors or {}).items():
         for proc in procs:

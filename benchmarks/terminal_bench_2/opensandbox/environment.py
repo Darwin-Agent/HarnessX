@@ -19,12 +19,12 @@ _EXECD_PORT = 44772
 _POLL_INTERVAL = 5  # seconds between status polls
 _START_TIMEOUT = 600  # seconds to wait for Running state (image pulls can take minutes)
 _POLL_READ_TIMEOUT = 10  # per-request read timeout during polling
-_DEFAULT_SERVER = os.environ.get("OPENSANDBOX_URL", "http://127.0.0.1:12081")
+_DEFAULT_SERVER = os.environ.get("OPENSANDBOX_URL", "").strip() or "http://127.0.0.1:12081"
 
 # Common host paths where `uv` is pre-installed; first match is used for injection.
 _UV_CANDIDATE_PATHS = [
     os.environ.get("TB2_UV_BINARY", ""),
-    "/root/.local/bin/uv",
+    str(Path.home() / ".local/bin/uv"),
     "/usr/local/bin/uv",
     "/opt/tb2-tools/uv",
 ]
@@ -81,7 +81,7 @@ class OpenSandboxEnvironment(BaseEnvironment):
     """Harbor environment backed by a self-hosted OpenSandbox server.
 
     Args:
-        server_url: OpenSandbox server base URL (default: OPENSANDBOX_URL env var
+        server_url: OpenSandbox server base URL (default: OPENSANDBOX_URL
             or http://127.0.0.1:12081).
         sandbox_timeout_sec: Max sandbox lifetime in seconds. Defaults to None
             (no server-side timeout). Harbor manages lifecycle via explicit DELETE
@@ -102,6 +102,8 @@ class OpenSandboxEnvironment(BaseEnvironment):
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
+        if not server_url:
+            raise ValueError("Set server_url or OPENSANDBOX_URL before using OpenSandboxEnvironment.")
         self._server_url = server_url.rstrip("/")
         self._sandbox_timeout = sandbox_timeout_sec
         self._registry_auth = registry_auth
@@ -263,9 +265,9 @@ class OpenSandboxEnvironment(BaseEnvironment):
 
         Installs to /usr/local/bin/uv (always in PATH, including non-interactive
         shells used by verifiers) and creates a uvx symlink there.  Also mirrors
-        to /root/.local/bin/ for scripts that hard-code the default uv install
-        path, and writes /root/.local/bin/env so ``source $HOME/.local/bin/env``
-        succeeds in verifier scripts.  No-ops silently if no host binary was
+        to the user-local bin directory for scripts that hard-code the default
+        uv install path, and writes an env activation script so verifier scripts
+        can use the user-local bin directory.  No-ops silently if no host binary was
         found or injection is disabled.
         """
         if not self._uv_host_path:
@@ -277,14 +279,14 @@ class OpenSandboxEnvironment(BaseEnvironment):
             await self.exec(
                 "chmod +x /usr/local/bin/uv"
                 " && ln -sf /usr/local/bin/uv /usr/local/bin/uvx"
-                " && mkdir -p /root/.local/bin"
-                " && ln -sf /usr/local/bin/uv /root/.local/bin/uv"
-                " && ln -sf /usr/local/bin/uv /root/.local/bin/uvx"
+                " && mkdir -p $HOME/.local/bin"
+                " && ln -sf /usr/local/bin/uv $HOME/.local/bin/uv"
+                " && ln -sf /usr/local/bin/uv $HOME/.local/bin/uvx"
                 # Create the env activation script that the uv installer normally
                 # writes; verifiers source it to add ~/.local/bin to PATH.
-                " && printf '#!/bin/sh\\nexport PATH=\"/root/.local/bin:/usr/local/bin:$PATH\"\\n'"
-                " > /root/.local/bin/env"
-                " && chmod +x /root/.local/bin/env"
+                " && printf '#!/bin/sh\\nexport PATH=\"$HOME/.local/bin:/usr/local/bin:$PATH\"\\n'"
+                " > $HOME/.local/bin/env"
+                " && chmod +x $HOME/.local/bin/env"
             )
             self.logger.info(f"OpenSandbox: injected uv from {self._uv_host_path} into sandbox {self._sandbox_id}")
         except Exception as exc:

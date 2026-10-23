@@ -32,7 +32,7 @@ Go to the application → **Bot** → **Privileged Gateway Intents** and enable:
 ### Get the Bot Token
 
 1. Go to the **Bot** tab → **Token** → **Reset Token**
-2. Copy the token (format similar to `MTxxxx.Gxxxx.xxxxxxxx`)
+2. Copy the token from the provider console.
 3. Keep it safe and do not expose it (the token is equivalent to a password)
 
 ---
@@ -75,7 +75,7 @@ channels:
   discord:
     enabled: true
     channel_type: discord
-    bot_token: "MTxxxxxxxxxxxxxxxxxx.Gxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    bot_token: "<your-bot-token>"
     require_mention: false   # Whether @mention is required (DMs always respond)
 ```
 
@@ -85,10 +85,10 @@ channels:
 channels:
   discord:
     enabled: true
-    bot_token: "MTxxxxxxxxxxxxxxxxxx.Gxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    application_id: "1234567890123456789"  # Required for slash commands
+    bot_token: "<your-bot-token>"
+    application_id: "<your-application-id>"  # Required for slash commands
     allowed_guilds:
-      - "1234567890123456789"   # Server ID; empty = allow all servers
+      - "<your-server-id>"   # Server ID; empty = allow all servers
     require_mention: false
     reply_in_thread: false
     max_steps: 30
@@ -102,9 +102,9 @@ To support Slash Commands from Discord Interactions (via Webhook rather than the
 channels:
   discord:
     enabled: true
-    bot_token: "MTxxxxxxxxxxxxxxxxxx..."
-    application_id: "1234567890123456789"
-    public_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    bot_token: "<your-bot-token>"
+    application_id: "<your-application-id>"
+    public_key: "<your-public-key>"
 ```
 
 > `public_key` is found under **General Information** → **Public Key** and is used to verify Interactions Webhook signatures.
@@ -213,10 +213,10 @@ channels:
   discord:
     enabled: true
     channel_type: discord
-    bot_token: "MTxxxxxxxxxxxxxxxxxx.Gxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    application_id: "1234567890123456789"
+    bot_token: "<your-bot-token>"
+    application_id: "<your-application-id>"
     allowed_guilds:
-      - "9876543210987654321"
+      - "<your-server-id>"
     require_mention: false
     reply_in_thread: false
     session_mode: shared

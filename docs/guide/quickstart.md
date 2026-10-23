@@ -21,14 +21,14 @@ Common env setup:
 
 ```bash
 # Anthropic
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 
 # OpenAI
-export OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY="<your-api-key>"
 
 # OpenAI-compatible local endpoint
-export OPENAI_API_BASE=http://127.0.0.1:8061/v1
-export OPENAI_API_KEY=EMPTY
+export OPENAI_API_BASE="<your-api-base-url>"
+export OPENAI_API_KEY="<your-api-key>"
 ```
 
 ## CLI

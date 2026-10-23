@@ -272,6 +272,8 @@ async def run_loop(
                         exc_info=True,
                     )
             context_window: int = getattr(active_model_provider, "context_window", 64_000)
+            _tool_result_role: str = getattr(active_model_provider, "tool_result_role", "tool")
+            _wrap_tool_response: bool = _tool_result_role == "user"
 
             # ── 0. Capture pre-step state snapshot z_t ─────────────────────
             # step_snapshots=False: skip copying the full message history — it grows
@@ -398,6 +400,9 @@ async def run_loop(
                 (e for e in reversed(_bm_events) if isinstance(e, BeforeModelEvent)),
                 before_event,
             )
+            for persistent_message in before_event.persistent_messages:
+                if not state.raw_messages or state.raw_messages[-1] != persistent_message:
+                    state.add_raw_message(persistent_message)
             await tracer.on_event(before_event)
 
             # ── 3. Call model ────────────────────────────────────────────────
@@ -526,6 +531,22 @@ async def run_loop(
                 try:
                     from ..tools.spawn_subagent import _spawn_ctx
 
+                    _provider_info = None
+                    if hasattr(active_model_provider, "step_captures"):
+                        _provider_info = {
+                            "url": getattr(active_model_provider, "url", ""),
+                            "tokenizer": getattr(active_model_provider, "tokenizer", None),
+                            "sampling_params": getattr(active_model_provider, "sampling_params", {}),
+                            "rollout_max_context_len": getattr(
+                                active_model_provider, "rollout_max_context_len", 32768
+                            ),
+                            "post_fn": getattr(active_model_provider, "_post_fn", None),
+                            "tool_call_format": getattr(active_model_provider, "_tool_call_format", "json"),
+                            "tool_result_role": getattr(active_model_provider, "tool_result_role", "tool"),
+                            "strip_think_prefix": getattr(active_model_provider, "_strip_think_prefix", False),
+                            "require_logprobs": getattr(active_model_provider, "require_logprobs", False),
+                            "stop_strings": getattr(active_model_provider, "_stop_strings", None),
+                        }
                     _spawn_ctx_token = _spawn_ctx.set(
                         {
                             "run_id": state.run_id,
@@ -536,6 +557,7 @@ async def run_loop(
                             "model_config": model_config,
                             "harness_config": harness_config,
                             "child_harness_config": child_harness_config,
+                            "provider_info": _provider_info,
                         }
                     )
                 except ImportError:
@@ -589,11 +611,13 @@ async def run_loop(
                             ]
                         else:
                             result_content = result_text
+                        if _wrap_tool_response and isinstance(result_content, str):
+                            result_content = f"<tool_response>\n{result_content}\n</tool_response>"
                         state.add_raw_message(
                             Message(
-                                role="tool",
+                                role=_tool_result_role,
                                 content=result_content,
-                                tool_call_id=tc_event.tool_call_id,
+                                tool_call_id=tc_event.tool_call_id if _tool_result_role == "tool" else None,
                                 name=tc_event.tool_name,
                             )
                         )
@@ -619,20 +643,26 @@ async def run_loop(
                         await tracer.on_event(tr_event)
                         state.add_tool_result(tr_event)
                         step_tool_results.append(tr_event)
+                        _syn_text = tr_event.result if not tr_event.error else f"Error: {tr_event.error}"
+                        if _wrap_tool_response:
+                            _syn_text = f"<tool_response>\n{_syn_text}\n</tool_response>"
                         state.add_raw_message(
                             Message(
-                                role="tool",
-                                content=tr_event.result if not tr_event.error else f"Error: {tr_event.error}",
-                                tool_call_id=tc_event.tool_call_id,
+                                role=_tool_result_role,
+                                content=_syn_text,
+                                tool_call_id=tc_event.tool_call_id if _tool_result_role == "tool" else None,
                                 name=tc_event.tool_name,
                             )
                         )
                     else:
+                        _not_approved = "Tool call not approved."
+                        if _wrap_tool_response:
+                            _not_approved = f"<tool_response>\n{_not_approved}\n</tool_response>"
                         state.add_raw_message(
                             Message(
-                                role="tool",
-                                content="Tool call not approved.",
-                                tool_call_id=tc_event.tool_call_id,
+                                role=_tool_result_role,
+                                content=_not_approved,
+                                tool_call_id=tc_event.tool_call_id if _tool_result_role == "tool" else None,
                                 name=tc_event.tool_name,
                             )
                         )
@@ -922,11 +952,17 @@ def _validate_messages(
     for m in result:
         if merged and merged[-1].role == "user" and m.role == "user":
             prev = merged[-1]
-            # Merge string contents; if either is a list (multimodal), keep only the newer one.
+            # Preserve all text and multimodal blocks when consecutive user messages merge.
             if isinstance(prev.content, str) and isinstance(m.content, str):
                 new_content = prev.content + "\n" + m.content if prev.content else m.content
+            elif isinstance(prev.content, list) and isinstance(m.content, list):
+                new_content = [*prev.content, *m.content]
+            elif isinstance(prev.content, list):
+                new_content = [*prev.content, {"type": "text", "text": str(m.content)}]
+            elif isinstance(m.content, list):
+                new_content = ([{"type": "text", "text": prev.content}] if prev.content else []) + list(m.content)
             else:
-                new_content = m.content  # non-string: keep the newer message's content
+                new_content = str(prev.content) + "\n" + str(m.content)
             merged[-1] = Message(role="user", content=new_content)
         else:
             merged.append(m)

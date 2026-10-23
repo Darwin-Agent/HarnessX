@@ -32,7 +32,7 @@
 ### 获取 Bot Token
 
 1. 进入 **Bot** 标签页 → **Token** → **Reset Token**
-2. 复制 Token（格式类似 `MTxxxx.Gxxxx.xxxxxxxx`）
+2. 从平台控制台复制 Token。
 3. 妥善保存，不要泄露（Token 与账号密码等同）
 
 ---
@@ -75,7 +75,7 @@ channels:
   discord:
     enabled: true
     channel_type: discord
-    bot_token: "MTxxxxxxxxxxxxxxxxxx.Gxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    bot_token: "<your-bot-token>"
     require_mention: false   # 是否需要 @机器人（DM 始终响应）
 ```
 
@@ -85,10 +85,10 @@ channels:
 channels:
   discord:
     enabled: true
-    bot_token: "MTxxxxxxxxxxxxxxxxxx.Gxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    application_id: "1234567890123456789"  # 斜线命令需要
+    bot_token: "<your-bot-token>"
+    application_id: "<your-application-id>"  # 斜线命令需要
     allowed_guilds:
-      - "1234567890123456789"   # 服务器 ID，空=允许所有服务器
+      - "<your-server-id>"   # 服务器 ID，空=允许所有服务器
     require_mention: false
     reply_in_thread: false
     max_steps: 30
@@ -102,9 +102,9 @@ channels:
 channels:
   discord:
     enabled: true
-    bot_token: "MTxxxxxxxxxxxxxxxxxx..."
-    application_id: "1234567890123456789"
-    public_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    bot_token: "<your-bot-token>"
+    application_id: "<your-application-id>"
+    public_key: "<your-public-key>"
 ```
 
 > `public_key` 在 **General Information** → **Public Key** 中获取，用于验证 Interactions Webhook 签名。
@@ -213,10 +213,10 @@ channels:
   discord:
     enabled: true
     channel_type: discord
-    bot_token: "MTxxxxxxxxxxxxxxxxxx.Gxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    application_id: "1234567890123456789"
+    bot_token: "<your-bot-token>"
+    application_id: "<your-application-id>"
     allowed_guilds:
-      - "9876543210987654321"
+      - "<your-server-id>"
     require_mention: false
     reply_in_thread: false
     session_mode: shared
