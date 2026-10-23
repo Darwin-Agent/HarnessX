@@ -10,6 +10,8 @@ from examples.parallel_search import search as example
 from harnessx.tools.base import ToolResult
 from harnessx.tools.mcp import MCPClient, MCPToolRegistry
 
+TEST_SEARCH_URL = "https://search-service.invalid/mcp"
+
 
 @pytest.mark.parametrize("headers", [None, {"User-Agent": "HarnessX/test"}])
 async def test_http_headers_reach_transport(monkeypatch, headers):
@@ -24,10 +26,10 @@ async def test_http_headers_reach_transport(monkeypatch, headers):
         yield ("read", "write", None)
 
     monkeypatch.setattr(streamable_http, "streamablehttp_client", transport)
-    client = MCPClient("http", url="https://search.parallel.ai/mcp", headers=headers)
+    client = MCPClient("http", url=TEST_SEARCH_URL, headers=headers)
     async with AsyncExitStack() as stack:
         assert await client._enter_http(stack) == ("read", "write")
-    assert observed == [("https://search.parallel.ai/mcp", {} if headers is None else {"headers": headers})]
+    assert observed == [(TEST_SEARCH_URL, {} if headers is None else {"headers": headers})]
 
 
 async def test_registry_passes_headers_to_client(monkeypatch):
@@ -48,23 +50,28 @@ async def test_registry_passes_headers_to_client(monkeypatch):
 
     monkeypatch.setattr("harnessx.tools.mcp.MCPClient", Client)
     headers = {"User-Agent": "HarnessX/test"}
-    registry = MCPToolRegistry(transport="http", url="https://search.parallel.ai/mcp", headers=headers)
+    registry = MCPToolRegistry(transport="http", url=TEST_SEARCH_URL, headers=headers)
     headers["User-Agent"] = "mutated"
     await registry.connect()
-    assert observed[0]["url"] == "https://search.parallel.ai/mcp"
+    assert observed[0]["url"] == TEST_SEARCH_URL
     assert observed[0]["headers"] == {"User-Agent": "HarnessX/test"}
     await registry.disconnect()
 
 
 @pytest.mark.parametrize("urls", [[], ["https://example.com"]])
-async def test_example_dispatches_and_closes(monkeypatch, capsys, urls):
+@pytest.mark.parametrize("endpoint", [None, TEST_SEARCH_URL])
+async def test_example_dispatches_and_closes(monkeypatch, capsys, urls, endpoint):
     calls = []
+    if endpoint is None:
+        monkeypatch.delenv("MCP_SEARCH_URL", raising=False)
+    else:
+        monkeypatch.setenv("MCP_SEARCH_URL", endpoint)
 
     class Registry:
         def __init__(self, **kwargs):
             assert kwargs == {
                 "transport": "http",
-                "url": "https://search.parallel.ai/mcp",
+                "url": endpoint or example.DEFAULT_SEARCH_URL,
                 "name": "parallel-search",
                 "headers": {"User-Agent": "HarnessX/0.1.0 (Parallel Search example)"},
             }

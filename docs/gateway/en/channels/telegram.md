@@ -16,7 +16,7 @@ You need a Telegram account and access to **BotFather** (Telegram's official bot
 4. Enter the bot's **username** (must end with `bot`, e.g. `harnessx_bot`)
 5. BotFather will return a **Bot Token** in the format:
    ```
-   123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+   <your-bot-token>
    ```
    Keep this safe and do not expose it.
 
@@ -73,7 +73,7 @@ channels:
   telegram:
     enabled: true
     channel_type: telegram
-    bot_token: "123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+    bot_token: "<your-bot-token>"
 ```
 
 ### Personal Assistant with Allowlist
@@ -82,9 +82,9 @@ channels:
 channels:
   telegram:
     enabled: true
-    bot_token: "123456789:ABC-DEF1234..."
+    bot_token: "<your-bot-token>"
     allowed_users:
-      - "123456789"    # Your Telegram user_id
+      - "<your-user-id>"    # Your Telegram user ID
     max_steps: 20
 ```
 
@@ -94,7 +94,7 @@ channels:
 channels:
   telegram:
     enabled: true
-    bot_token: "123456789:ABC-DEF1234..."
+    bot_token: "<your-bot-token>"
     require_mention: false   # No @mention required in groups (privacy mode must be disabled)
     reply_in_thread: true    # Reply in thread (reduces flooding)
     session_mode: per_user   # Independent session per user
@@ -175,9 +175,9 @@ channels:
   telegram:
     enabled: true
     channel_type: telegram
-    bot_token: "123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+    bot_token: "<your-bot-token>"
     allowed_users:
-      - "123456789"
+      - "<your-user-id>"
       - "987654321"
     require_mention: false
     reply_in_thread: false

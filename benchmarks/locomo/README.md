@@ -1,5 +1,7 @@
 # LoCoMo
 
+**English** | [简体中文](README.zh-CN.md)
+
 Integration of [LoCoMo](https://github.com/snap-research/locomo) (SNAP Research) into HarnessX.
 
 LoCoMo is a **long-term conversational memory benchmark**. Each sample is a multi-session
@@ -37,15 +39,14 @@ benchmarks/locomo/
 ├── ingester.py    # SessionIngester + compressors (Verbatim, Summary, Facts, LightMemory)
 ├── harness.py     # make_locomo_harness(), LightMemoryBackend, v7f SYSTEM_PROMPT
 ├── judge.py       # EverMemOS-aligned LLM-as-Judge (judge_accuracy, compute_aligned_accuracy)
-├── run_eval.py    # batch evaluation CLI
-└── run.sh         # example run command
+└── run_eval.py    # batch evaluation CLI
 ```
 
 ## Setup
 
 ### Prerequisites
 
-- Python >= 3.10
+- Python >= 3.11
 - LLM API credentials (Anthropic or OpenAI-compatible)
 - Dataset: local `locomo10.json` or HuggingFace `snap-research/locomo`
 
@@ -60,10 +61,10 @@ uv sync  # or: pip install -e .
 ```bash
 # Option A: Anthropic proxy (supports extended thinking)
 export ANTHROPIC_BASE_URL=https://...
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 
 # Option B: LiteLLM / Azure OpenAI
-export OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY="<your-api-key>"
 ```
 
 ## Usage

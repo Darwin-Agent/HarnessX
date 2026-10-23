@@ -13,7 +13,7 @@ Only the latest release on `main` is actively maintained for security fixes.
 
 **Please do not open a public GitHub issue for security vulnerabilities.**
 
-Report security issues privately via [GitHub Security Advisories](../../security/advisories/new).
+Report security issues privately through the repository's Security Advisories page.
 This ensures the issue can be investigated and patched before public disclosure.
 
 ### What to include

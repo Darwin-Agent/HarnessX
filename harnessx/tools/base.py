@@ -66,6 +66,9 @@ _log = logging.getLogger(__name__)
 async def _execute_tool(t: Tool, input: dict) -> ToolResult:
     """Execute a Tool's fn, handling both sync and async callables."""
     try:
+        validation_error = _validate_input(t.input_schema, input)
+        if validation_error:
+            return ToolResult(output="", error=validation_error)
         if inspect.iscoroutinefunction(t.fn):
             result = await t.fn(**input)
         else:
@@ -77,6 +80,48 @@ async def _execute_tool(t: Tool, input: dict) -> ToolResult:
     except Exception as e:
         _log.debug("Tool %r raised an exception: %s", t.name, e, exc_info=True)
         return ToolResult(output="", error=str(e))
+
+
+def _validate_input(schema: dict, value: object) -> str | None:
+    if not isinstance(value, dict):
+        return "Tool input must be an object"
+    properties = schema.get("properties", {}) if isinstance(schema, dict) else {}
+    for name in schema.get("required", []) if isinstance(schema, dict) else []:
+        if name not in value:
+            return f"Missing required parameter: {name}"
+    for name, item in value.items():
+        expected = properties.get(name) if isinstance(properties, dict) else None
+        if expected is None or _matches_schema(item, expected):
+            continue
+        expected_type = expected.get("type", "the declared type") if isinstance(expected, dict) else "the declared type"
+        return f"Parameter '{name}' must be {expected_type}"
+    return None
+
+
+def _matches_schema(value: object, schema: dict) -> bool:
+    if not isinstance(schema, dict):
+        return True
+    alternatives = schema.get("anyOf") or schema.get("oneOf")
+    if alternatives:
+        return any(_matches_schema(value, candidate) for candidate in alternatives)
+    expected = schema.get("type")
+    if isinstance(expected, list):
+        return any(_matches_schema(value, {**schema, "type": candidate}) for candidate in expected)
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "object":
+        return isinstance(value, dict)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "null":
+        return value is None
+    return True
 
 
 def _truncate_result(result: ToolResult, tool_name: str) -> ToolResult:

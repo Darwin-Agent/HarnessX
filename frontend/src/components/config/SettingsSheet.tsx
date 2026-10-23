@@ -16,11 +16,11 @@ const NAV_ITEMS: { id: SettingsPage; icon: React.ReactNode; labelKey: string }[]
   { id: 'plugins',   icon: <Puzzle size={16} />,     labelKey: 'settings.page.plugins' },
 ]
 
-const PAGE_TITLES: Record<SettingsPage, { en: string; zh: string; desc: string }> = {
-  workspace: { en: 'Workspace', zh: '工作区', desc: 'Set up your local workspace directory and browse files.' },
-  tools:     { en: 'Tools',     zh: '工具',  desc: 'Enable or disable built-in tools and configure MCP servers.' },
-  skills:    { en: 'Skills',    zh: '技能',  desc: 'Manage built-in skills that are auto-injected into each step.' },
-  plugins:   { en: 'Plugins',   zh: '插件',  desc: 'Discover, enable, and manage installed plugins.' },
+const PAGE_TITLES: Record<SettingsPage, { titleKey: string; descKey: string }> = {
+  workspace: { titleKey: 'settings.page.workspace', descKey: 'settings.page.workspace.desc' },
+  tools:     { titleKey: 'settings.page.tools', descKey: 'settings.page.tools.desc' },
+  skills:    { titleKey: 'settings.page.skills', descKey: 'settings.page.skills.desc' },
+  plugins:   { titleKey: 'settings.page.plugins', descKey: 'settings.page.plugins.desc' },
 }
 
 export function SettingsSheet() {
@@ -90,7 +90,7 @@ export function SettingsSheet() {
         </span>
         <span style={{ color: 'var(--border)', fontSize: '14px' }}>/</span>
         <span style={{ fontSize: '14px', color: 'var(--accent)', fontWeight: 500 }}>
-          {lang === 'zh' ? pageInfo.zh : pageInfo.en}
+          {t(pageInfo.titleKey)}
         </span>
 
         <div className="flex-1" />
@@ -101,6 +101,8 @@ export function SettingsSheet() {
             <button
               key={l}
               onClick={() => setLang(l)}
+              aria-label={l === 'en' ? 'Switch language to English' : '切换语言为中文'}
+              aria-pressed={lang === l}
               className="px-2 py-1 rounded-md transition-all duration-150 font-medium"
               style={{
                 fontSize: '12px',
@@ -109,7 +111,7 @@ export function SettingsSheet() {
                 fontFamily: l === 'zh' ? 'system-ui, sans-serif' : 'JetBrains Mono, monospace',
               }}
             >
-              {l === 'en' ? 'EN' : '中'}
+              {l === 'en' ? 'EN' : '中文'}
             </button>
           ))}
         </div>
@@ -217,10 +219,10 @@ export function SettingsSheet() {
             {/* Page header */}
             <div className="mb-7">
               <h1 className="font-bold" style={{ fontSize: '22px', color: 'var(--text-1)', letterSpacing: '-0.03em' }}>
-                {lang === 'zh' ? pageInfo.zh : pageInfo.en}
+                {t(pageInfo.titleKey)}
               </h1>
               <p className="mt-1.5" style={{ fontSize: '14px', color: 'var(--text-3)', lineHeight: 1.6 }}>
-                {pageInfo.desc}
+                {t(pageInfo.descKey)}
               </p>
             </div>
 

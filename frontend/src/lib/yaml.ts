@@ -293,7 +293,7 @@ export function yamlToHarnessConfig(text: string): Partial<HarnessConfig> {
 //       provider: anthropic
 //       _target_: harnessx.providers.anthropic_provider.AnthropicProvider
 //       model: claude-sonnet-4-6
-//       api_key: sk-ant-...
+//       api_key: <your-api-key>
 //       _display_name: Claude Sonnet 4.6
 //       _capabilities: [text, code, vl]
 //   roles:

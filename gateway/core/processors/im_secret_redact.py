@@ -19,7 +19,7 @@ _REDACTED = "***REDACTED***"
 
 # Matches known high-entropy API key formats inline (value capture group 1)
 _KEY_VALUE_PATTERNS: list[re.Pattern[str]] = [
-    # Anthropic:  sk-ant-api03-<80+ chars>
+    # Provider-specific long token format.
     re.compile(r"(sk-ant-[A-Za-z0-9_\-]{20,})", re.ASCII),
     # OpenAI / generic sk- keys
     re.compile(r"(sk-[A-Za-z0-9]{32,})", re.ASCII),
@@ -28,7 +28,7 @@ _KEY_VALUE_PATTERNS: list[re.Pattern[str]] = [
         r"""((?:api[_\-]key|secret[_\-]key|access[_\-]token)\s*[:=]\s*["']?)([A-Za-z0-9_\-\.]{20,})""",
         re.IGNORECASE,
     ),
-    # Environment variable assignment:  ANTHROPIC_API_KEY=sk-...
+    # Environment variable assignments containing credential values.
     re.compile(
         r"""(\b[A-Z][A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD)\s*=\s*["']?)([A-Za-z0-9_\-\.]{16,})""",
         re.ASCII,
@@ -79,7 +79,7 @@ class IMSecretRedactProcessor(MultiHookProcessor):
     """Redact API keys and secrets from tool results before they reach the model.
 
     Two modes:
-    - Always-on regex scan for known key formats (sk-ant-*, sk-*, etc.)
+    - Always-on regex scan for known provider credential formats.
     - Targeted scan when the tool reads a sensitive config path (model_config.yaml,
       .env, gateway.yaml, .harnessx/) — these files commonly contain plaintext keys.
     """

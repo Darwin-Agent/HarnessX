@@ -6,7 +6,7 @@ daemon via a socket mount (Docker-in-Docker via socket), bind mount source
 paths must be translated from our container's overlay filesystem to the
 corresponding real path on the Docker host.
 
-Harbor's DockerEnvironment passes paths like /root/.../verifier directly to
+Harbor's DockerEnvironment passes verifier paths directly to
 docker compose as HOST_VERIFIER_LOGS_PATH etc.  The Docker daemon resolves
 these on the *host* filesystem, which is a different filesystem from our
 container's overlay — so writes from spawned containers never appear in our
@@ -249,7 +249,7 @@ for line in lines:
     # curl … | sh  — uv installer (astral.sh or direct GitHub release)
     if re.search(r'curl\b', s) and '|' in s:
         if re.search(r'astral\.sh.*uv|github\.com/astral-sh/uv', s):
-            if _sh('command -v uv || test -x /root/.local/bin/uv || test -x /root/.cargo/bin/uv') == 0:
+            if _sh('command -v uv || test -x "$HOME/.local/bin/uv" || test -x "$HOME/.cargo/bin/uv"') == 0:
                 out.append('# [warm-cache] uv present — skipped: ' + s)
                 skipped.append('uv-install')
                 continue
@@ -273,9 +273,9 @@ for line in lines:
             continue
 
     # uvx [-p <ver>] [-w <pkg>]* <tool> [args…]  →  persistent venv
-    # Creates /root/.tb2_warm_venv once; subsequent runs skip the install.
+    # Creates a user-local warm venv once; subsequent runs skip the install.
     if re.match(r'^uvx\b', s):
-        _VENV = '/root/.tb2_warm_venv'
+        _VENV = '${HOME}/.tb2_warm_venv'
         _py_ver = re.search(r'-p\s+(\S+)', s)
         _pkgs   = re.findall(r'-w\s+(\S+)', s)
         _cmd    = re.sub(r'-p\s+\S+\s*', '', re.sub(r'^uvx\s+', '', s))
@@ -318,8 +318,8 @@ set -e
 [ -f test.sh ] || exit 0
 _uv_present() {
     command -v uv >/dev/null 2>&1 || \
-    test -x /root/.local/bin/uv || \
-    test -x /root/.cargo/bin/uv
+    test -x "$HOME/.local/bin/uv" || \
+    test -x "$HOME/.cargo/bin/uv"
 }
 _apt_lists_fresh() {
     find /var/lib/apt/lists -maxdepth 1 -name '*.InRelease' -mmin -1440 2>/dev/null | grep -q .
@@ -341,7 +341,7 @@ while IFS= read -r line; do
                 fi
             fi;;
         uvx\ -p\ *|uvx\ -w\ *|uvx\ --with\ *)
-            _tb2_venv="/root/.tb2_warm_venv"
+        _tb2_venv="${HOME}/.tb2_warm_venv"
             _uv_bin=$(echo "$s" \
                 | sed -e 's/^uvx[[:space:]]*//' \
                       -e 's/-p[[:space:]]*[^[:space:]]*[[:space:]]*//' \

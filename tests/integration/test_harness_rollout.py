@@ -256,6 +256,22 @@ class TestRewardFunc:
         assert result["trajectory_quality"] == "complete"
 
     @pytest.mark.asyncio
+    async def test_reward_func_zero_reward_failed_evaluation_is_not_correct(self):
+        from recipe.slime.harness_rollout import reward_func
+
+        sample = self._make_sample_with_traj(terminal=0.0, exit_reason="done")
+        sample.metadata["eval_result"] = EvalResult(
+            passed=False,
+            score=0.0,
+            reason="zero-reward failure",
+            reward=0.0,
+        )
+
+        result = await reward_func(None, sample)
+
+        assert result["is_correct"] == 0
+
+    @pytest.mark.asyncio
     async def test_reward_func_wrong_answer_with_tool_turns(self):
         """terminal=-1.0 with tool turns → RetoolCompatPRM applies shaping."""
         from recipe.slime.harness_rollout import reward_func

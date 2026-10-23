@@ -70,7 +70,7 @@ Harness**X** 中的 **X** 代表可e**X**tensible（可扩展）行为组合 —
   <img src="docs/assets/harnessx_architecture.png" alt="HarnessX Architecture" width="800"/>
 </p>
 
-→ 完整的 9 维行为流水线、处理器钩子点及组合 API，详见 **[docs/architecture.md](docs/architecture.md)**。
+→ 完整的 9 维行为流水线、处理器钩子点及组合 API，详见[架构说明](docs/architecture.zh-CN.md)。
 
 ---
 
@@ -115,7 +115,7 @@ cd frontend && npm install && npm run build && cd ..
 ### CLI
 
 ```bash
-export ANTHROPIC_API_KEY=sk-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 
 hx "研究 2026 年 AI Agent 趋势并撰写结构化报告"
 hx -p "用 Python 写一个 fizzbuzz"     # 非交互模式，输出后退出
@@ -164,12 +164,7 @@ asyncio.run(main())
 <a id="benchmarks"></a>
 ## 📊 基准测试
 
-HarnessX 提供两个进化循环，可在任意基准测试上系统性地提升 Agent 性能：
-
-- **Harness 进化** —— 元 Harness 分析轨迹，自动搜索更优的处理器组合、提示策略和工具配置，*无需更换模型*。
-- **模型进化** —— Harness 运行产生的带奖励标注轨迹通过 [VERL](https://github.com/volcengine/verl) 驱动 RL 微调，持续改进模型本身。
-
-两个循环可组合使用：先进化 Harness，再在此基础上进化模型。以下是在 [GAIA](https://huggingface.co/datasets/gaia-benchmark/GAIA) 基准测试上的结果。更多基准测试及适配器详情，见 [`benchmarks/README.md`](benchmarks/README.md)。
+HarnessX 支持 Harness 搜索、分布式模型训练，以及 Harness 与模型交替协同演进。下方实验展示 Harness 搜索和先 Harness 后模型的顺序优化。各流程的使用方式见[进化指南](docs/guide/evolution.zh-CN.md)，更多基准适配器见 [`benchmarks/README.md`](benchmarks/README.md)。
 
 ### Harness 进化（Qwen 3.5 9B）
 
@@ -187,13 +182,19 @@ HarnessX 提供两个进化循环，可在任意基准测试上系统性地提�
   <img src="docs/assets/Harness_Evolution.png" alt="Harness Evolution — Per-Domain Accuracy" width="700"/>
 </p>
 
-### 模型-Harness 协同进化（Qwen 3.5 9B）
+### 顺序进化：先 Harness 进化，再优化模型（Qwen 3.5 9B）
 
-两个循环协同运行时，收益叠加：Harness 进化将基线从 33.97% 提升至 41.67%；模型进化进一步推至 **55.77%** —— **相对提升 +64%**，全程基于 9B 模型。→ 复现：[`recipe/verl_harnessX/`](recipe/verl_harnessX/)
+两阶段流程中，Harness 进化将基线从 33.97% 提升至 41.67%；随后模型优化进一步推至 **55.77%** —— **相对提升 +64%**，全程基于 9B 模型。→ 依次运行 [`recipe/gaia_evolver/`](recipe/gaia_evolver/) 和 [`recipe/verl_harnessX/`](recipe/verl_harnessX/)。
 
 <p align="center">
   <img src="docs/assets/HarnessX_Model_Co_evolution.png" alt="Model-Harness Co-Evolution" width="700"/>
 </p>
+
+### Harness 与模型交替协同演进
+
+每轮先使用当前 Harness 种群正常运行 Agent 探索并保存轨迹；探索结束后，MetaAgent 基于这些轨迹执行 AEGIS Harness 进化；随后跨 Harness 模型进化从 buffer 离线更新模型。每个任务、每个 Harness 的单次 rollout 属于正常 Agent 采样；模型训练阶段不生成回答。进化后的 Harness 状态与新模型权重共同进入下一轮。
+
+入口为 `python -m recipe.coevolution.run --backend verl`。[协同演进运行手册](recipe/coevolution/README.zh-CN.md)包含环境安装、数据格式、元模型配置、权重导出与恢复方式。
 
 ---
 
@@ -223,8 +224,8 @@ HarnessX/
 │   ├── bundles/               # 📦 预组合能力 Bundle
 │   ├── api/                   # 🌐 FastAPI + SSE（供 Lab UI 使用）
 │   └── cli.py                 # ⌨️ CLI 入口（hx）
-├── benchmarks/                # 📊 4 个已集成 + 3 个进行中的基准测试
-├── recipe/                    # 🧪 slime（RL 训练配方）
+├── benchmarks/                # 📊 5 个已集成 + 2 个进行中的基准测试
+├── recipe/                    # 🧪 协同演进、veRL、Slime、基准进化配方
 ├── examples/                  # 📖 编码 / 研究 / 助手 / 自定义处理器
 ├── extensions/                # 🔌 技能扩展（docx、pdf、pptx、xlsx）
 ├── frontend/                  # 🖥️ Lab UI（React + TypeScript + Tailwind）
@@ -236,34 +237,41 @@ HarnessX/
 <a id="roadmap"></a>
 ## 🗺️ 路线图
 
-> 规划项目的详细设计说明和动机，见 [ROADMAP](docs/ROADMAP.md)。
+> 规划项目的详细设计说明和动机，见[路线图](docs/ROADMAP.zh-CN.md)。
 
 | 阶段 | 重点 | 状态 |
 |:----:|------|:----:|
-| **1** | 核心：9 维行为流水线、13 个处理器、多提供商支持、SFT/RL 桥接、4 个基准测试、Lab UI | ![current](https://img.shields.io/badge/-当前-22c55e?style=flat-square) |
+| **1** | 核心：9 维行为流水线、13 个处理器、多提供商支持、SFT/RL 桥接、5 个基准测试、Lab UI | ![current](https://img.shields.io/badge/-当前-22c55e?style=flat-square) |
 | **2** | 元优化：贝叶斯优化、元 Harness、自动配置搜索 | ![in progress](https://img.shields.io/badge/-进行中-f59e0b?style=flat-square) |
-| **3** | 自进化：闭环训练、HarnessHUB 社区市场 | ![planned](https://img.shields.io/badge/-规划中-8b5cf6?style=flat-square) |
-| **4** | 记忆：多模态后端、第三方集成（VERL、SuperMemory、OpenVKing） | ![planned](https://img.shields.io/badge/-规划中-8b5cf6?style=flat-square) |
+| **3** | 自进化：Harness 与模型交替训练；HarnessHUB 社区市场 | ![in progress](https://img.shields.io/badge/-进行中-f59e0b?style=flat-square) |
+| **4** | 记忆：Light-Memory、LoCoMo；多模态后端与第三方记忆适配器 | ![in progress](https://img.shields.io/badge/-进行中-f59e0b?style=flat-square) |
 
-### 仓库内实现
+### 已提供
 
-- [x] **[Light-Memory](docs/feats/light-memory.md)** —— 基于文件的记忆，支持时间衰减、每日压缩、git 版本控制（`harnessx/plugins/dimensions/light_memory/`）
-- [x] **Slime RL 配方** —— SGLang rollout 适配器 + token 标注 + GRPO 训练流水线（`recipe/slime/`）
-- [x] **MetaHarness** —— Agent 观察自身轨迹并提出 Harness 配置变更；观察者 Harness + 元 Agent + 沙箱提升循环
-- [ ] **LoCoMo 基准测试** —— 长上下文记忆评估：会话召回、跨轮一致性、压缩保真度
-- [ ] **贝叶斯优化** —— 在约 10^6 配置的 Harness 空间上进行代理模型搜索
-- [ ] **HarnessHUB** —— 社区平台，用于发布、版本管理和拉取 `HarnessConfig` Bundle（`hx pull coding-agent@v1.2`；Lab UI 面板；私有注册表）
-- [ ] **多模态记忆** —— 通过插件系统实现基于 CLIP 的图像/视频记忆后端
-- [ ] **Harness 记忆进化** —— 闭环：轨迹 → RL 微调 → 更优模型 → 更优 Harness；种群级变异 + 数据飞轮
+- ✅ **[Light-Memory](docs/feats/light-memory.zh-CN.md)** —— 基于文件的记忆，支持时间衰减、每日压缩、git 版本控制（`harnessx/plugins/dimensions/light_memory/`）
+- ✅ **Slime RL 配方** —— SGLang rollout 适配器 + token 标注 + GRPO 训练流水线（`recipe/slime/`）
+- ✅ **MetaHarness** —— Agent 观察自身轨迹并提出 Harness 配置变更；观察者 Harness + 元 Agent + 沙箱提升循环
+- ✅ **[LoCoMo 基准测试](benchmarks/locomo/README.zh-CN.md)** —— 多会话对话记忆评估，可配置会话压缩、问答评分与模型裁判
+- ✅ **[Harness 与模型协同演进](recipe/coevolution/README.zh-CN.md)** —— 交替执行 MetaAgent Harness 搜索与跨 Harness GRPO，支持权重导出和逐轮恢复
 
-### 第三方集成 *（可选接入，位于 `recipe/`）*
+### 规划中
 
-- [x] **[VERL](https://github.com/volcengine/verl)** —— 将 HarnessX rollout 接入分布式 PPO / GRPO 训练循环
-- [ ] **[MemPalace](https://github.com/mem-palace/mem-palace)** —— 结构化情节记忆后端
-- [ ] **[SuperMemory](https://supermemory.ai)** —— 通过插件系统实现云端语义记忆
-- [ ] **[OpenVKing](https://github.com/openvking)** —— 面向实体丰富领域的向量知识图谱记忆
-- [ ] **记忆质量指标** —— 通过 HarnessJournal 暴露检索精度/召回率
-- [ ] **数据合成流水线** —— 带多样性约束的受控 SFT / 偏好数据集生成
+- ◻️ **贝叶斯优化** —— 在约 10^6 配置的 Harness 空间上进行代理模型搜索
+- ◻️ **HarnessHUB** —— 社区平台，用于发布、版本管理和拉取 `HarnessConfig` Bundle（`hx pull coding-agent@v1.2`；Lab UI 面板；私有注册表）
+- ◻️ **多模态记忆** —— 通过插件系统实现基于 CLIP 的图像/视频记忆后端
+- ◻️ **Harness 记忆进化** —— 面向记忆策略的种群搜索，以及从部署到训练的数据飞轮
+
+### 已提供的第三方集成 *（可选接入，位于 `recipe/`）*
+
+- ✅ **[veRL](recipe/verl/README.zh-CN.md)** —— HarnessX 轨迹与分布式 GRPO 训练
+
+### 规划中的第三方集成
+
+- ◻️ **[MemPalace](https://github.com/mem-palace/mem-palace)** —— 结构化情节记忆后端
+- ◻️ **[SuperMemory](https://supermemory.ai)** —— 通过插件系统实现云端语义记忆
+- ◻️ **[OpenVKing](https://github.com/openvking)** —— 面向实体丰富领域的向量知识图谱记忆
+- ◻️ **记忆质量指标** —— 通过 HarnessJournal 暴露检索精度/召回率
+- ◻️ **数据合成流水线** —— 带多样性约束的受控 SFT / 偏好数据集生成
 
 ---
 

@@ -494,10 +494,10 @@ def main() -> None:
     _kill_port(port)
     handler = partial(ReviewHandler, workspace, skill_name, feedback_path, previous, benchmark_path)
     try:
-        server = HTTPServer(("127.0.0.1", port), handler)
+        server = HTTPServer(("localhost", port), handler)
     except OSError:
         # Port still in use after kill attempt — find a free one
-        server = HTTPServer(("127.0.0.1", 0), handler)
+        server = HTTPServer(("localhost", 0), handler)
         port = server.server_address[1]
 
     url = f"http://localhost:{port}"
