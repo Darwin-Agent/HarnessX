@@ -70,6 +70,7 @@ async def test_errors_are_raised_and_registry_closed(monkeypatch, failure):
 
 def test_cli_publishes_sample_and_shows_token_hint(monkeypatch, capsys):
     calls = []
+    monkeypatch.delenv("DEEDPAGE_TOKEN", raising=False)
     monkeypatch.setattr(example, "MCPToolRegistry", _fake_registry(calls, '{"token": "deed_tok_test"}'))
     monkeypatch.setattr(sys, "argv", ["publish.py"])
     example.main()
@@ -79,6 +80,7 @@ def test_cli_publishes_sample_and_shows_token_hint(monkeypatch, capsys):
 
 def test_cli_publishes_file(monkeypatch, tmp_path):
     calls = []
+    monkeypatch.delenv("DEEDPAGE_TOKEN", raising=False)
     page = tmp_path / "report.html"
     page.write_text("<h1>report</h1>", encoding="utf-8")
     monkeypatch.setattr(example, "MCPToolRegistry", _fake_registry(calls))
@@ -101,3 +103,17 @@ def test_cli_delete_with_token(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["publish.py", "--delete", "my-report"])
     example.main()
     assert calls[1] == ("delete_site", {"slug": "my-report", "token": "deed_tok_test"})
+
+
+def test_cli_update_forwards_token(monkeypatch, tmp_path):
+    calls = []
+    page = tmp_path / "report.html"
+    page.write_text("<h1>v2</h1>", encoding="utf-8")
+    monkeypatch.setenv("DEEDPAGE_TOKEN", "deed_tok_test")
+    monkeypatch.setattr(example, "MCPToolRegistry", _fake_registry(calls))
+    monkeypatch.setattr(sys, "argv", ["publish.py", str(page), "--slug", "my-report", "--ttl", "0"])
+    example.main()
+    assert calls[1] == (
+        "publish_site",
+        {"files": {"index.html": "<h1>v2</h1>"}, "slug": "my-report", "token": "deed_tok_test"},
+    )

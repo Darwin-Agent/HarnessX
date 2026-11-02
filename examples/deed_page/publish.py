@@ -26,13 +26,18 @@ def _registry():
     )
 
 
-async def publish(html, slug=None, ttl_seconds=3600):
-    """Publish ``html`` as index.html and return the tool output (url, slug, token)."""
+async def publish(html, slug=None, ttl_seconds=3600, token=None):
+    """Publish ``html`` as index.html and return the tool output (url, slug, token).
+
+    Pass the owner ``token`` from the first publish to update an existing slug.
+    """
     arguments = {"files": {"index.html": html}}
     if slug:
         arguments["slug"] = slug
     if ttl_seconds:
         arguments["ttl_seconds"] = ttl_seconds
+    if token:
+        arguments["token"] = token
     return await _call("publish_site", arguments)
 
 
@@ -70,7 +75,7 @@ def main():
         asyncio.run(delete(args.delete, token))
         return
     html = Path(args.file).read_text(encoding="utf-8") if args.file else SAMPLE_PAGE
-    output = asyncio.run(publish(html, args.slug, args.ttl))
+    output = asyncio.run(publish(html, args.slug, args.ttl, os.environ.get("DEEDPAGE_TOKEN")))
     try:
         token = json.loads(output).get("token")
     except (TypeError, ValueError, AttributeError):

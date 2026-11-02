@@ -23,7 +23,14 @@ after an hour (`--ttl 3600`). It prints the tool output, which includes `url`,
 python examples/deed_page/publish.py report.html --slug <your-slug> --ttl 0
 ```
 
-Delete a page with the token from its first publish:
+To update the page later, re-run with the same slug and the token from its
+first publish:
+
+```bash
+DEEDPAGE_TOKEN=deed_tok_... python examples/deed_page/publish.py report.html --slug <your-slug> --ttl 0
+```
+
+Delete a page with the same token:
 
 ```bash
 DEEDPAGE_TOKEN=deed_tok_... python examples/deed_page/publish.py --delete <your-slug>
