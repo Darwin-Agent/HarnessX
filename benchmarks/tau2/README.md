@@ -72,11 +72,11 @@ uv pip install --python ~/tau2-bench/.venv/bin/python -e /path/to/HarnessX
 ```bash
 # Agent model endpoint (Anthropic-compatible, required for extended thinking)
 export ANTHROPIC_BASE_URL=https://...
-export ANTHROPIC_API_KEY=sk-...
+export ANTHROPIC_API_KEY="<your-api-key>"
 
 # User simulator endpoint (OpenAI-compatible)
 export OPENAI_API_BASE=https://...
-export OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY="<your-api-key>"
 ```
 
 > **Why does this depend on `~/tau2-bench/`?**

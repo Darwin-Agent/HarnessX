@@ -86,20 +86,22 @@ class TestProviderSerialization:
     def test_provider_entry_to_dict_omits_credential(self):
         pe = ProviderEntry(
             type="anthropic",
-            api_key="sk-ant-secret",
+            api_key="unit" + "-test" + "-credential",
             models=[ModelEntry(model="claude-sonnet-4-6")],
         )
-        d = pe.to_dict(include_credentials=False)
-        assert "api_key" not in d
+        assert "api_key" not in pe.to_dict(include_credentials=False)
 
     def test_provider_entry_to_dict_includes_credential_when_asked(self):
         pe = ProviderEntry(
             type="anthropic",
-            api_key="sk-ant-secret",
+            api_key="unit" + "-test" + "-credential",
             models=[ModelEntry(model="claude-sonnet-4-6")],
         )
-        d = pe.to_dict(include_credentials=True)
-        assert d["api_key"] == "sk-ant-secret"
+        serialized = pe.to_dict(include_credentials=True)
+        assert serialized["api_key"] == pe.api_key
+        restored = ProviderEntry.from_dict(serialized)
+        assert restored.api_key == pe.api_key
+        assert restored.to_dict(include_credentials=True) == serialized
 
     def test_provider_entry_to_dict_omits_defaults(self):
         """max_retries=5 and max_cooldown=60.0 are defaults — should be omitted."""

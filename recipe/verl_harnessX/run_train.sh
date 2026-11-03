@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -xeuo pipefail
+set -euo pipefail
 
 # ============================================================
 #  HarnessX GRPO Training Script — 8×H100, Qwen3.5-9B
@@ -20,16 +20,16 @@ export NCCL_DEBUG="${NCCL_DEBUG:-WARN}"       # NCCL communication log level (WA
 export TOKENIZERS_PARALLELISM=false           # Disable tokenizer multithreading to avoid fork deadlocks
 
 # ---------- API Keys ----------
-export OPENAI_API_KEY="${OPENAI_API_KEY:-your-api-key-here}"      # OpenAI-compatible API key
-export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-your-api-key-here}"  # Anthropic API key
+export OPENAI_API_KEY="${OPENAI_API_KEY:-}"      # OpenAI-compatible API key
+export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"  # Anthropic API key
 
 # ---------- API Endpoints ----------
-export OPENAI_API_BASE="${OPENAI_API_BASE:-http://your-api-endpoint/v1}"   # OpenAI-compatible API endpoint
-export ANTHROPIC_API_BASE="${ANTHROPIC_API_BASE:-http://your-api-endpoint}" # Anthropic API endpoint
+export OPENAI_API_BASE="${OPENAI_API_BASE:-}"   # Optional OpenAI-compatible API endpoint
+export ANTHROPIC_API_BASE="${ANTHROPIC_API_BASE:-}" # Optional Anthropic API endpoint
 
 # ---------- MCP Search Service ----------
-export MCP_SEARCH_URL="${MCP_SEARCH_URL:-https://your-mcp-search-endpoint/mcp}"  # MCP search service endpoint (WebSearch primary engine)
-export MCP_SEARCH_KEY="${MCP_SEARCH_KEY:-your-mcp-key-here}"                      # MCP authentication key
+export MCP_SEARCH_URL="${MCP_SEARCH_URL:-}"  # Optional MCP search service endpoint
+export MCP_SEARCH_KEY="${MCP_SEARCH_KEY:-}"                      # Optional MCP authentication key
 
 # ---------- Timeout Architecture ----------
 # 2-layer timeout: L1 ToolCall → L2 Tool Internal

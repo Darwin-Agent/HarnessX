@@ -1,0 +1,484 @@
+--- a/verl/experimental/agent_loop/agent_loop.py
++++ b/verl/experimental/agent_loop/agent_loop.py
+@@ -197,6 +197,8 @@
+     """Auxiliary performance metrics"""
+     extra_fields: dict[str, Any] = {}
+     """Extra fields for dynamic addition."""
++    sub_outputs: Optional[list["AgentLoopOutput"]] = None
++    """MATPO: subagent outputs for multi-agent token-level training."""
+
+
+ class _InternalAgentLoopOutput(AgentLoopOutput):
+@@ -673,6 +675,21 @@
+             kwargs=kwargs,
+         )
+
++        # MATPO: postprocess sub_outputs and stash in extra_fields for _postprocess
++        _matpo_sub_internals = None
++        if output.sub_outputs:
++            _matpo_sub_internals = []
++            for sub_out in output.sub_outputs:
++                sub_out.extra_fields.setdefault("raw_prompt", kwargs.get("raw_prompt"))
++                sub_out.extra_fields.setdefault("reward_extra_info", {"accuracy": 0.0, "format_reward": 0.0, "tool_call_reward": 0.0})
++                sub_out.extra_fields["is_subagent"] = True
++                sub_internal = await self._postprocess_single_output(sub_out)
++                _matpo_sub_internals.append(sub_internal)
++
++        result_extra = dict(output.extra_fields)
++        if _matpo_sub_internals:
++            result_extra["_matpo_sub_internals"] = _matpo_sub_internals
++
+         return _InternalAgentLoopOutput(
+             prompt_ids=prompt_output["input_ids"],
+             response_ids=response_output["input_ids"],
+@@ -687,6 +704,69 @@
+             reward_score=output.reward_score,
+             num_turns=output.num_turns,
+             metrics=output.metrics,
++            extra_fields=result_extra,
++        )
++
++    async def _postprocess_single_output(self, output: AgentLoopOutput) -> _InternalAgentLoopOutput:
++        """Pad a single AgentLoopOutput into _InternalAgentLoopOutput (MATPO helper)."""
++        self.tokenizer.padding_side = "left"
++        prompt_output = self.tokenizer.pad(
++            {"input_ids": output.prompt_ids},
++            padding="max_length",
++            max_length=self.rollout_config.prompt_length,
++            return_tensors="pt",
++            return_attention_mask=True,
++        )
++        if prompt_output["input_ids"].dim() == 1:
++            prompt_output["input_ids"] = prompt_output["input_ids"].unsqueeze(0)
++            prompt_output["attention_mask"] = prompt_output["attention_mask"].unsqueeze(0)
++
++        self.tokenizer.padding_side = "right"
++        response_output = self.tokenizer.pad(
++            {"input_ids": output.response_ids},
++            padding="max_length",
++            max_length=self.rollout_config.response_length,
++            return_tensors="pt",
++            return_attention_mask=True,
++        )
++        if response_output["input_ids"].dim() == 1:
++            response_output["input_ids"] = response_output["input_ids"].unsqueeze(0)
++            response_output["attention_mask"] = response_output["attention_mask"].unsqueeze(0)
++
++        response_mask_output = self.tokenizer.pad(
++            {"input_ids": output.response_mask},
++            padding="max_length",
++            max_length=self.rollout_config.response_length,
++            return_tensors="pt",
++            return_attention_mask=False,
++        )
++        if response_mask_output["input_ids"].dim() == 1:
++            response_mask_output["input_ids"] = response_mask_output["input_ids"].unsqueeze(0)
++
++        response_logprobs = None
++        if output.response_logprobs is not None:
++            pad_size = self.rollout_config.response_length - len(output.response_logprobs)
++            response_logprobs = torch.tensor(output.response_logprobs + [0.0] * pad_size).unsqueeze(0)
++
++        response_mask = response_mask_output["input_ids"] * response_output["attention_mask"]
++        attention_mask = torch.cat([prompt_output["attention_mask"], response_output["attention_mask"]], dim=1)
++        input_ids = torch.cat([prompt_output["input_ids"], response_output["input_ids"]], dim=1)
++        position_ids = compute_position_id_with_mask(attention_mask)
++
++        return _InternalAgentLoopOutput(
++            prompt_ids=prompt_output["input_ids"],
++            response_ids=response_output["input_ids"],
++            input_ids=input_ids,
++            position_ids=position_ids,
++            response_mask=response_mask,
++            attention_mask=attention_mask,
++            response_logprobs=response_logprobs,
++            routed_experts=None,
++            multi_modal_inputs=None,
++            multi_modal_data=None,
++            reward_score=output.reward_score,
++            num_turns=output.num_turns,
++            metrics=output.metrics if hasattr(output.metrics, "model_dump") else AgentLoopMetrics(),
+             extra_fields=output.extra_fields,
+         )
+
+@@ -696,6 +776,9 @@
+         if self.processor is None:
+             return multi_modal_inputs
+
++        if output.multi_modal_data is None:
++            return multi_modal_inputs
++
+         images = output.multi_modal_data.get("images")
+         videos = output.multi_modal_data.get("videos")
+         # split the videos and according metadatas
+@@ -727,7 +810,7 @@
+
+     def _compute_position_ids(self, input_ids, attention_mask, multi_modal_inputs) -> torch.Tensor:
+         """Compute position ids for multi-modal inputs."""
+-        if self.processor is None:
++        if self.processor is None or not multi_modal_inputs:
+             return compute_position_id_with_mask(attention_mask)  # (1, seq_len)
+
+         multi_modal_kwargs = {
+@@ -791,19 +874,35 @@
+         inputs: list[_InternalAgentLoopOutput],
+         input_non_tensor_batch: dict | None = None,
+     ) -> DataProto:
+-        """Process the padded outputs from _run_agent_loop and combine them into a batch."""
++        """Process the padded outputs from _run_agent_loop and combine them into a batch.
++
++        MATPO extension: if any input has sub_outputs, those are postprocessed
++        and appended to the batch with is_subagent=True flag.
++        """
++        # MATPO: collect subagent outputs and postprocess them
++        sub_inputs: list[_InternalAgentLoopOutput] = []
++        parent_indices_for_subs: list[int] = []
++        for parent_idx, inp in enumerate(inputs):
++            sub_outputs = inp.extra_fields.get("_matpo_sub_internals")
++            if sub_outputs:
++                for sub_inp in sub_outputs:
++                    sub_inputs.append(sub_inp)
++                    parent_indices_for_subs.append(parent_idx)
++
++        all_inputs = list(inputs) + sub_inputs
++
+         # Convert lists back to tensors and stack them to create a batch.
+-        prompt_ids = torch.cat([input.prompt_ids for input in inputs], dim=0)
+-        response_ids = torch.cat([input.response_ids for input in inputs], dim=0)
+-        response_mask = torch.cat([input.response_mask for input in inputs], dim=0)
+-        attention_mask = torch.cat([input.attention_mask for input in inputs], dim=0)
+-        input_ids = torch.cat([input.input_ids for input in inputs], dim=0)
+-        position_ids = torch.cat([input.position_ids for input in inputs], dim=0)
++        prompt_ids = torch.cat([input.prompt_ids for input in all_inputs], dim=0)
++        response_ids = torch.cat([input.response_ids for input in all_inputs], dim=0)
++        response_mask = torch.cat([input.response_mask for input in all_inputs], dim=0)
++        attention_mask = torch.cat([input.attention_mask for input in all_inputs], dim=0)
++        input_ids = torch.cat([input.input_ids for input in all_inputs], dim=0)
++        position_ids = torch.cat([input.position_ids for input in all_inputs], dim=0)
+         optional_outputs = {}
+-        if inputs[0].response_logprobs is not None:
+-            optional_outputs["rollout_log_probs"] = torch.cat([input.response_logprobs for input in inputs], dim=0)
+-        if inputs[0].routed_experts is not None:
+-            optional_outputs["routed_experts"] = torch.cat([input.routed_experts for input in inputs], dim=0)
++        if all_inputs[0].response_logprobs is not None:
++            optional_outputs["rollout_log_probs"] = torch.cat([input.response_logprobs for input in all_inputs], dim=0)
++        if all_inputs[0].routed_experts is not None:
++            optional_outputs["routed_experts"] = torch.cat([input.routed_experts for input in all_inputs], dim=0)
+
+         batch = TensorDict(
+             {
+@@ -816,10 +915,10 @@
+                 "position_ids": position_ids,
+                 **optional_outputs,
+             },
+-            batch_size=len(inputs),
++            batch_size=len(all_inputs),
+         )
+
+-        scores = [input.reward_score for input in inputs]
++        scores = [input.reward_score for input in all_inputs]
+         if all(score is not None for score in scores):
+             prompt_length = prompt_ids.size(1)
+             response_length = attention_mask[:, prompt_length:].sum(dim=1) - 1
+@@ -828,25 +927,40 @@
+             batch["rm_scores"] = rm_scores
+
+         non_tensor_batch = {
+-            "__num_turns__": np.array([input.num_turns for input in inputs], dtype=np.int32),
++            "__num_turns__": np.array([input.num_turns for input in all_inputs], dtype=np.int32),
+         }
+         if self.reward_loop_worker_handles is None and input_non_tensor_batch:
+-            non_tensor_batch.update(input_non_tensor_batch)
++            # Expand input_non_tensor_batch to cover sub_inputs (repeat parent's values)
++            if sub_inputs and input_non_tensor_batch:
++                expanded = {}
++                for k, v in input_non_tensor_batch.items():
++                    sub_values = [v[pi] for pi in parent_indices_for_subs]
++                    expanded[k] = np.concatenate([v, np.array(sub_values, dtype=v.dtype)])
++                non_tensor_batch.update(expanded)
++            else:
++                non_tensor_batch.update(input_non_tensor_batch)
++
++        # MATPO: add is_subagent flag
++        is_subagent = np.array(
++            [False] * len(inputs) + [True] * len(sub_inputs), dtype=bool
++        )
++        non_tensor_batch["is_subagent"] = is_subagent
+
+         # add reward_extra_info to non_tensor_batch
+-        reward_extra_infos = [input.extra_fields.get("reward_extra_info", {}) for input in inputs]
+-        reward_extra_keys = list(reward_extra_infos[0].keys())
++        reward_extra_infos = [input.extra_fields.get("reward_extra_info", {}) for input in all_inputs]
++        reward_extra_keys = list(reward_extra_infos[0].keys()) if reward_extra_infos else []
+         for key in reward_extra_keys:
+-            non_tensor_batch[key] = np.array([info[key] for info in reward_extra_infos])
++            non_tensor_batch[key] = np.array([info.get(key, 0.0) for info in reward_extra_infos])
+
+         # Add multi_modal_inputs to non_tensor_batch if any samples have them
+-        multi_modal_inputs_list = [input.multi_modal_inputs for input in inputs]
++        multi_modal_inputs_list = [input.multi_modal_inputs for input in all_inputs]
+         if any(mmi is not None for mmi in multi_modal_inputs_list):
+             non_tensor_batch["multi_modal_inputs"] = np.array(multi_modal_inputs_list, dtype=object)
+
+-        metrics = [input.metrics.model_dump() for input in inputs]
++        metrics = [input.metrics.model_dump() if hasattr(input.metrics, "model_dump") else {} for input in all_inputs]
+         # Collect extra fields from all inputs and convert them to np.ndarray
+-        # Keep a stable set of keys so downstream batch concat stays consistent across agent loops.
++        # Skip internal MATPO keys that are not per-sample scalars
++        _SKIP_EXTRA_KEYS = {"_matpo_sub_internals"}
+         extra_fields = {}
+         default_extra_keys = {
+             "turn_scores",
+@@ -855,10 +969,10 @@
+             "max_global_steps",
+             "extras",
+         }
+-        all_keys = set(key for input_item in inputs for key in input_item.extra_fields) | default_extra_keys
++        all_keys = (set(key for input_item in all_inputs for key in input_item.extra_fields) | default_extra_keys) - _SKIP_EXTRA_KEYS
+         for key in all_keys:
+-            temp_arr = np.empty(len(inputs), dtype=object)
+-            temp_arr[:] = [input.extra_fields.get(key) for input in inputs]
++            temp_arr = np.empty(len(all_inputs), dtype=object)
++            temp_arr[:] = [input.extra_fields.get(key) for input in all_inputs]
+             extra_fields[key] = temp_arr
+
+         non_tensor_batch.update(extra_fields)
+@@ -1046,6 +1160,11 @@
+         )
+         output = DataProto.concat(outputs)
+
++        if "is_subagent" in output.non_tensor_batch:
++            from recipe.verl.matpo.batch import order_rollout_rows
++
++            output = order_rollout_rows(output, validation=prompts.meta_info.get("validate", False))
++
+         # calculate performance metrics
+         metrics = [output.meta_info.pop("metrics") for output in outputs]  # List[List[Dict[str, str]]]
+         timing = self._performance_metrics(metrics, output)
+--- a/verl/trainer/ppo/core_algos.py
++++ b/verl/trainer/ppo/core_algos.py
+@@ -1168,7 +1168,8 @@
+             if dp_size > 1:
+                 raise ValueError("(global) batch_num_tokens is required when dp_size > 1")
+             batch_num_tokens = loss_mask.sum()
+-        loss = verl_F.masked_sum(loss_mat, loss_mask) / batch_num_tokens * dp_size
++        denominator = torch.as_tensor(batch_num_tokens, device=loss_mat.device).clamp_min(1)
++        loss = verl_F.masked_sum(loss_mat, loss_mask) / denominator * dp_size
+     elif loss_agg_mode in ["seq-mean-token-sum", "seq-mean-token-sum-norm"]:
+         seq_losses = torch.sum(loss_mat * loss_mask, dim=-1)  # token-sum
+         seq_mask = (torch.sum(loss_mask, dim=-1) > 0).float()  # exclude fully masked sequences
+@@ -1176,7 +1177,8 @@
+             if dp_size > 1:
+                 raise ValueError("global_batch_size is required when dp_size > 1")
+             global_batch_size = seq_mask.sum()
+-        loss = verl_F.masked_sum(seq_losses, seq_mask) / global_batch_size * dp_size  # seq-mean
++        denominator = torch.as_tensor(global_batch_size, device=loss_mat.device).clamp_min(1)
++        loss = verl_F.masked_sum(seq_losses, seq_mask) / denominator * dp_size
+         if loss_agg_mode == "seq-mean-token-sum-norm":
+             if loss_scale_factor is None:
+                 horizon = loss_mask.shape[-1]
+@@ -1190,7 +1192,8 @@
+             if dp_size > 1:
+                 raise ValueError("global_batch_size is required when dp_size > 1")
+             global_batch_size = seq_mask.sum()
+-        loss = verl_F.masked_sum(seq_losses, seq_mask) / global_batch_size * dp_size  # seq-mean
++        denominator = torch.as_tensor(global_batch_size, device=loss_mat.device).clamp_min(1)
++        loss = verl_F.masked_sum(seq_losses, seq_mask) / denominator * dp_size
+     else:
+         raise ValueError(f"Invalid loss_agg_mode: {loss_agg_mode}")
+
+--- a/verl/trainer/ppo/ray_trainer.py
++++ b/verl/trainer/ppo/ray_trainer.py
+@@ -178,15 +178,29 @@
+         # Initialize the mask for GRPO calculation
+         grpo_calculation_mask = data.batch["response_mask"]
+
+-        # Call compute_grpo_outcome_advantage with parameters matching its definition
+-        advantages, returns = core_algos.compute_grpo_outcome_advantage(
+-            token_level_rewards=data.batch["token_level_rewards"],
+-            response_mask=grpo_calculation_mask,
+-            index=data.non_tensor_batch["uid"],
+-            norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
+-        )
++        # MATPO: if subagent rows exist, compute advantage on parents then broadcast
++        is_subagent = data.non_tensor_batch.get("is_subagent")
++        if (is_subagent is not None and is_subagent.any()) or "rollout_failed" in data.non_tensor_batch:
++            from recipe.verl.matpo.advantage import compute_matpo_advantage
++            advantages, returns = compute_matpo_advantage(
++                token_level_rewards=data.batch["token_level_rewards"],
++                response_mask=grpo_calculation_mask,
++                index=data.non_tensor_batch["uid"],
++                non_tensor_batch=data.non_tensor_batch,
++                norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
++            )
++        else:
++            # Standard GRPO (no subagents in batch)
++            advantages, returns = core_algos.compute_grpo_outcome_advantage(
++                token_level_rewards=data.batch["token_level_rewards"],
++                response_mask=grpo_calculation_mask,
++                index=data.non_tensor_batch["uid"],
++                norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
++            )
+         data.batch["advantages"] = advantages
+         data.batch["returns"] = returns
++
++
+     else:
+         # handle all other adv estimator type other than GAE and GRPO
+         adv_estimator_fn = core_algos.get_adv_estimator_fn(adv_estimator)
+@@ -530,6 +544,9 @@
+             sample_gts.extend(ground_truths)
+
+             test_gen_batch = self._get_gen_batch(test_batch)
++            from recipe.coevolution.behavior import route_harnesses
++
++            route_harnesses(test_gen_batch, 1, validation=True)
+             test_gen_batch.meta_info = {
+                 "eos_token_id": self.tokenizer.eos_token_id,
+                 "pad_token_id": self.tokenizer.pad_token_id,
+@@ -565,6 +582,9 @@
+             output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
+             sample_outputs.extend(output_texts)
+
++            for overlap_key in list(test_output_gen_batch.batch.keys()):
++                if overlap_key in test_batch.batch.keys():
++                    del test_batch.batch[overlap_key]
+             test_batch = test_batch.union(test_output_gen_batch)
+             test_batch.meta_info["validate"] = True
+
+@@ -1312,6 +1332,10 @@
+                     repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True
+                 )
+
++                from recipe.coevolution.behavior import route_harnesses
++
++                route_harnesses(gen_batch_output, self.config.actor_rollout_ref.rollout.n)
++
+                 is_last_step = self.global_steps >= self.total_training_steps
+                 with marked_timer("step", timing_raw):
+                     # generate a batch
+@@ -1356,10 +1380,29 @@
+                             del rm_scores, gen_baseline_batch, gen_baseline_output
+                     # repeat to align with repeated responses in rollout
+                     batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
++
++                    if "is_subagent" in gen_batch_output.non_tensor_batch:
++                        from recipe.verl.matpo.batch import expand_parent_batch
++
++                        batch = expand_parent_batch(batch, gen_batch_output)
++
++                    for overlap_key in list(gen_batch_output.batch.keys()):
++                        if overlap_key in batch.batch.keys():
++                            del batch.batch[overlap_key]
+                     batch = batch.union(gen_batch_output)
+
+                     if "response_mask" not in batch.batch.keys():
+                         batch.batch["response_mask"] = compute_response_mask(batch)
++
++                    if not batch.batch["response_mask"].any():
++                        raise RuntimeError("All HarnessX rollouts failed; refusing to train an all-masked batch")
++
++                    # MATPO: pad batch to be divisible by ppo_mini_batch_size
++                    _mini_bs = self.config.actor_rollout_ref.actor.ppo_mini_batch_size
++                    if len(batch) % _mini_bs != 0:
++                        from recipe.verl.matpo.padding import pad_matpo_batch
++                        batch, _matpo_pad_size = pad_matpo_batch(batch, _mini_bs)
++
+                     # Balance the number of valid tokens across DP ranks.
+                     # NOTE: This usually changes the order of data in the `batch`,
+                     # which won't affect the advantage calculation (since it's based on uid),
+@@ -1369,12 +1412,15 @@
+
+                     # compute global_valid tokens
+                     batch.meta_info["global_token_num"] = torch.sum(batch.batch["attention_mask"], dim=-1).tolist()
+-                    # get images_seqlens
++                    # get images_seqlens (only for multimodal inputs)
+                     images_seqlens_all = []
+-                    for multi_modal_input in batch.non_tensor_batch["multi_modal_inputs"]:
+-                        if "image_grid_thw" not in multi_modal_input.keys():
+-                            continue
+-                        images_seqlens_all.extend(multi_modal_input["images_seqlens"].tolist())
++                    if "multi_modal_inputs" in batch.non_tensor_batch:
++                        for multi_modal_input in batch.non_tensor_batch["multi_modal_inputs"]:
++                            if multi_modal_input is None:
++                                continue
++                            if "image_grid_thw" not in multi_modal_input.keys():
++                                continue
++                            images_seqlens_all.extend(multi_modal_input["images_seqlens"].tolist())
+                     batch.meta_info["images_seqlens"] = images_seqlens_all
+                     with marked_timer("reward", timing_raw, color="yellow"):
+                         # compute reward model score
+--- a/verl/trainer/ppo/rollout_corr_helper.py
++++ b/verl/trainer/ppo/rollout_corr_helper.py
+@@ -398,7 +398,7 @@
+         apply_lower_threshold: Whether to mask/log metrics for values below the lower threshold.
+     """
+     if not response_mask.any():
+-        raise ValueError("response_mask must contain at least one valid token (1).")
++        return {}
+
+     metrics: dict[str, float] = {}
+     prefix = f"rollout_rs_{option_name}"
+@@ -624,7 +624,7 @@
+         Dictionary of IS weight metrics (all scalars).
+     """
+     if not response_mask.any():
+-        raise ValueError("response_mask must contain at least one valid token (1).")
++        return {}
+
+     metrics: dict[str, float] = {}
+     device: torch.device = rollout_is_weights.device
+@@ -765,7 +765,7 @@
+     """
+     # Validate input masks
+     if not response_mask.any():
+-        raise ValueError("response_mask must contain at least one valid token (1).")
++        return {}
+     if old_log_prob.shape != rollout_log_prob.shape:
+         raise ValueError(
+             f"old_log_prob shape {old_log_prob.shape} does not match rollout_log_prob shape {rollout_log_prob.shape}."
+@@ -866,8 +866,9 @@
+     Returns:
+         Dictionary of off-policy metrics (without prefix)
+     """
+-    # Validate that we have at least one valid token
+-    assert response_mask.any(), "Expected at least one valid token in response_mask"
++    # Skip if no valid tokens (e.g. MATPO padding rows)
++    if not response_mask.any():
++        return {}
+
+     metrics = {}
+
+--- a/verl/utils/fsdp_utils.py
++++ b/verl/utils/fsdp_utils.py
+@@ -246,7 +246,7 @@
+         # is already registered previously
+         if param is not None and param not in registered:
+             param_cls = type(module._parameters[name])
+-            kwargs = module._parameters[name].__dict__
++            kwargs = {k: v for k, v in module._parameters[name].__dict__.items() if not k.startswith("_")}
+             kwargs["requires_grad"] = param.requires_grad
+             module._parameters[name] = param_cls(module._parameters[name].to(device), **kwargs)
+             registered.add(module._parameters[name])
+--- a/verl/utils/torch_functional.py
++++ b/verl/utils/torch_functional.py
+@@ -33,7 +33,7 @@
+ try:
+     from flash_attn.ops.triton.cross_entropy import cross_entropy_loss
+
+-    FLAH_ATTN_CROSS_ENTROPY_LOSS_AVAILABLE = True
++    FLAH_ATTN_CROSS_ENTROPY_LOSS_AVAILABLE = False  # Disabled: incompatible with ulysses SP (verl#6284)
+ except ImportError:
+     FLAH_ATTN_CROSS_ENTROPY_LOSS_AVAILABLE = False
+
+--- a/verl/workers/actor/dp_actor.py
++++ b/verl/workers/actor/dp_actor.py
+@@ -213,7 +213,7 @@
+                 if self.use_ulysses_sp:
+                     is_vlm_model = hasattr(
+                         getattr(self.actor_module, "module", self.actor_module).config, "vision_config"
+-                    )
++                    ) and bool(multi_modal_inputs)
+                     if is_vlm_model:
+                         # vlm model's inputs will be sliced after embedding
+                         input_ids_rmpad, position_ids_rmpad, pad_size = ulysses_pad(

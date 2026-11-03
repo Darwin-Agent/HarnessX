@@ -34,11 +34,9 @@ def _load_dataset() -> dict:
 
     import pyarrow as pa
 
-    arrow_path = (
-        "/root/.cache/huggingface/datasets/princeton-nlp___swe-bench_lite"
-        "/default/0.0.0/6ec7bb89b9342f664a54a6e0a6ea6501d3437cc2"
-        "/swe-bench_lite-test.arrow"
-    )
+    arrow_path = os.environ.get("SWEBENCH_DATASET_ARROW", "").strip()
+    if not arrow_path:
+        raise RuntimeError("Set SWEBENCH_DATASET_ARROW to the local SWE-bench Arrow dataset before evaluation.")
     reader = pa.ipc.open_stream(arrow_path)
     table = reader.read_all()
     instances = {}

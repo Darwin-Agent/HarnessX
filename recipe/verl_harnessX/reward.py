@@ -60,7 +60,7 @@ TOOL_CALL_REWARD_WEIGHT = 0.1
 #     """Call LLM judge to evaluate answer accuracy. Returns 1.0 or 0.0."""
 #     import httpx
 #
-#     api_base = api_base or os.environ.get("OPENAI_API_BASE", "http://your-api-endpoint/v1")
+#     api_base = api_base or os.environ.get("OPENAI_API_BASE")
 #     api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
 #
 #     prompt = _JUDGE_PROMPT.format(

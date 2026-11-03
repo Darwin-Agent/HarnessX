@@ -15,12 +15,12 @@ Minimal setup (pick one provider):
 
 ```bash
 # Anthropic
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=<your-api-key>
 ANTHROPIC_DEFAULT_MAIN_MODEL=claude-sonnet-4-6
 
 # OpenAI / compatible endpoint
-OPENAI_API_BASE=http://your-endpoint/v1
-OPENAI_API_KEY=sk-...
+OPENAI_API_BASE=<your-api-base-url>
+OPENAI_API_KEY=<your-api-key>
 OPENAI_DEFAULT_MAIN_MODEL=openai/your-model
 ```
 

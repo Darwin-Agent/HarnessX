@@ -57,12 +57,12 @@ Minimal `.env` (pick one provider):
 
 ```bash
 # Anthropic
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=<your-api-key>
 ANTHROPIC_DEFAULT_MAIN_MODEL=claude-haiku-4-5-20251001
 
 # OpenAI-compatible endpoint
-OPENAI_API_BASE=http://localhost:8000/v1
-OPENAI_API_KEY=sk-...
+OPENAI_API_BASE=<your-api-base-url>
+OPENAI_API_KEY=<your-api-key>
 OPENAI_DEFAULT_MAIN_MODEL=openai/your-model
 ```
 

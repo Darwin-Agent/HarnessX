@@ -68,8 +68,8 @@
 channels:
   feishu:
     enabled: true
-    app_id: "cli_xxxx"
-    app_secret: "xxxxxxxxxxxx"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
     mode: websocket           # 默认即 websocket，可省略
     require_mention: true     # 群聊中需要 @机器人
     reply_in_thread: false
@@ -92,11 +92,11 @@ channels:
 channels:
   feishu:
     enabled: true
-    app_id: "cli_xxxx"
-    app_secret: "xxxxxxxxxxxx"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
     mode: webhook
-    verification_token: "xxxx"   # 事件订阅页面的 Verification Token
-    encrypt_key: "xxxx"          # 可选：AES 加密 Key
+    verification_token: "<your-verification-token>"   # 事件订阅页面的 Verification Token
+    encrypt_key: "<your-encrypt-key>"          # 可选：AES 加密 Key
     require_mention: true
 ```
 
@@ -196,8 +196,8 @@ channels:
   feishu:
     enabled: true
     channel_type: feishu
-    app_id: "cli_a1b2c3d4e5f6"
-    app_secret: "your_app_secret_here"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
     mode: websocket
     require_mention: true
     reply_in_thread: false

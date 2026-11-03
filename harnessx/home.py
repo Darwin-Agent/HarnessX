@@ -34,7 +34,7 @@ def default_agent_id() -> str:
 def _cwd_project() -> str:
     """Derive a safe project name from the current working directory.
 
-    Example: ``/root/projects/harnessx`` → ``root-projects-harnessx``
+    Example: ``~/projects/harnessx`` → ``home-projects-harnessx``
     """
     cwd = str(Path.cwd())
     # Strip leading path separators
@@ -53,7 +53,7 @@ def default_project() -> str:
 
     When ``HARNESSX_PROJECT`` is set it takes priority.  Otherwise the project
     name is derived from the current working directory, e.g.
-    ``/root/projects/harnessx`` → ``root-projects-harnessx``.
+    ``~/projects/harnessx`` → ``home-projects-harnessx``.
     """
     env = os.environ.get("HARNESSX_PROJECT", "").strip()
     if env:

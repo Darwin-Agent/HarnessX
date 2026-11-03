@@ -261,9 +261,11 @@ export const api = {
 
   // ── Help / Docs ─────────────────────────────────────────────────────────────
 
-  docTree(): Promise<DocTree> { return get('/help') },
+  docTree(lang = 'en'): Promise<DocTree> { return get(`/help?lang=${encodeURIComponent(lang)}`) },
 
-  docContent(path: string): Promise<DocContent> { return get(`/help/${path}`) },
+  docContent(path: string, lang = 'en'): Promise<DocContent> {
+    return get(`/help/${path}?lang=${encodeURIComponent(lang)}`)
+  },
 
   // ── Session history ─────────────────────────────────────────────────────────
 

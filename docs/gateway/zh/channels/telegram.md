@@ -16,7 +16,7 @@
 4. 输入 Bot 的**用户名**（必须以 `bot` 结尾，如 `harnessx_bot`）
 5. BotFather 返回 **Bot Token**，格式为：
    ```
-   123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+   <your-bot-token>
    ```
    妥善保存，不要泄露。
 
@@ -73,7 +73,7 @@ channels:
   telegram:
     enabled: true
     channel_type: telegram
-    bot_token: "123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+    bot_token: "<your-bot-token>"
 ```
 
 ### 带白名单的个人助理
@@ -82,9 +82,9 @@ channels:
 channels:
   telegram:
     enabled: true
-    bot_token: "123456789:ABC-DEF1234..."
+    bot_token: "<your-bot-token>"
     allowed_users:
-      - "123456789"    # 你的 Telegram user_id
+      - "<your-user-id>"    # 你的 Telegram user ID
     max_steps: 20
 ```
 
@@ -94,7 +94,7 @@ channels:
 channels:
   telegram:
     enabled: true
-    bot_token: "123456789:ABC-DEF1234..."
+    bot_token: "<your-bot-token>"
     require_mention: false   # 群组中不需要 @机器人（需关闭隐私模式）
     reply_in_thread: true    # 在 thread 中回复（减少刷屏）
     session_mode: per_user   # 每个用户独立会话
@@ -175,9 +175,9 @@ channels:
   telegram:
     enabled: true
     channel_type: telegram
-    bot_token: "123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+    bot_token: "<your-bot-token>"
     allowed_users:
-      - "123456789"
+      - "<your-user-id>"
       - "987654321"
     require_mention: false
     reply_in_thread: false

@@ -1,0 +1,3 @@
+# verl agent loop registration — uses HarnessX full RunLoop
+- name: harnessx_full
+  _target_: recipe.verl.agent_loop.HarnessXAgentLoop

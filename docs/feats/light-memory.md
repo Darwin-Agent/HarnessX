@@ -1,5 +1,7 @@
 # Light-Memory  *(self-developed)*
 
+**English** | [简体中文](light-memory.zh-CN.md)
+
 > **Memory dimension (3)** · `harnessx/plugins/dimensions/light_memory/`
 
 Light-Memory is an **original memory system** built entirely within this repository.

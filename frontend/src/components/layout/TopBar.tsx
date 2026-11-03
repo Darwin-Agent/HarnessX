@@ -326,6 +326,8 @@ export function TopBar() {
           <button
             key={l}
             onClick={() => setLang(l)}
+            aria-label={l === 'en' ? 'Switch language to English' : '切换语言为中文'}
+            aria-pressed={lang === l}
             className="px-1.5 py-1 rounded-lg transition-all duration-150"
             style={{
               fontSize: '12px',
@@ -335,7 +337,7 @@ export function TopBar() {
               fontFamily: l === 'zh' ? 'Outfit, system-ui, sans-serif' : 'JetBrains Mono, monospace',
             }}
           >
-            {l === 'en' ? 'EN' : '中'}
+            {l === 'en' ? 'EN' : '中文'}
           </button>
         ))}
 

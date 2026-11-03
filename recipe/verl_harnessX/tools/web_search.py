@@ -36,7 +36,7 @@ _fail_count: int = 0
 
 _MCP_POOL = [
     {
-        "url": os.environ.get("MCP_SEARCH_URL", "https://your-mcp-search-endpoint/mcp"),
+        "url": os.environ.get("MCP_SEARCH_URL", "").strip(),
         "tool": "search",
         "init": False,
     },
@@ -91,6 +91,8 @@ async def _search_mcp(query: str, max_results: int) -> list[dict]:
         headers["Authorization"] = f"Bearer {mcp_key}"
     last_err = None
     for ep in pool:
+        if not ep["url"]:
+            continue
         call_payload = {
             "jsonrpc": "2.0",
             "id": 1,

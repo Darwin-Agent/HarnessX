@@ -75,7 +75,7 @@ Common flags (see `--help` for the full set):
 |---|---|---|
 | `--max-tasks N` | How many GAIA tasks per round | 6 |
 | `--num-rounds N` | Rounds including R0 baseline | 3 |
-| `--model` | Model for the inner (task-doing) agent | `anthropic/YOUR_PROVIDER/claude-sonnet-4-6` |
+| `--model` | Model for the inner (task-doing) agent | `<provider>/<model>` |
 | `--meta-model` | Model for the meta-agent and judge (stronger tier) | `anthropic/YOUR_PROVIDER/claude-opus-4-6` |
 | `--provider-id` | Provider header for routing | `YOUR_PROVIDER_ID` |
 | `--api-base` / `--api-key` | Route inner agent to a custom OpenAI-compatible endpoint | unset |

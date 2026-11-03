@@ -20,7 +20,7 @@ import tomllib
 from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).parent.parent  # recipe/tb2_evolver/
-_HARBOR_TASKS_CACHE = Path("/root/.cache/harbor/tasks")
+_HARBOR_TASKS_CACHE = Path.home() / ".cache/harbor/tasks"
 _DEFAULT_MAX_AGENT_TIMEOUT = 1800.0
 
 

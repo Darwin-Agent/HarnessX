@@ -70,7 +70,7 @@ print(f"{passed}/{len(tasks)} resolved")
 ## Environment variables
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...   # or OPENAI_API_KEY
+export ANTHROPIC_API_KEY="<your-api-key>"   # or OPENAI_API_KEY
 # Docker must be available — no additional env vars needed
 ```
 

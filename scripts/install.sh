@@ -411,9 +411,9 @@ guide_apikey() {
     fi
     warn "ANTHROPIC_API_KEY not set"
     echo "  Add to your shell profile for permanent use:"
-    echo '    export ANTHROPIC_API_KEY="sk-ant-..."'
+    echo '    export ANTHROPIC_API_KEY="<your-api-key>"'
     echo "  Or set it inline at runtime:"
-    echo '    ANTHROPIC_API_KEY=sk-ant-... hx "your task"'
+    echo '    ANTHROPIC_API_KEY="<your-api-key>" hx "your task"'
 }
 
 # ── §9  Summary ───────────────────────────────────────────────────────────────

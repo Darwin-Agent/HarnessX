@@ -4,7 +4,7 @@
 Each task image (alexgshaw/<task>:20251031) is rebuilt from scratch with:
   - curl installed via apt
   - uv binary copied from the host (no internet download needed)
-  - /root/.local/bin/env activation script written
+  - a user-local env activation script written
 
 The rebuilt image is tagged as the SAME original name, so OpenSandbox
 picks up the local image without any config changes (pull-if-not-present
@@ -36,8 +36,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-_DEFAULT_UV = os.environ.get("TB2_UV_BINARY", "") or "/root/.local/bin/uv"
-_HARBOR_TASK_CACHE = "/root/.cache/harbor/tasks"
+_DEFAULT_UV = os.environ.get("TB2_UV_BINARY", "") or str(Path.home() / ".local/bin/uv")
+_HARBOR_TASK_CACHE = os.environ.get("HARBOR_TASK_CACHE", str(Path.home() / ".cache/harbor/tasks"))
 
 # Dockerfile template.  The uv binary is COPY-ed from the build context
 # (no internet needed).  curl is installed via apt (internet needed once,
@@ -50,12 +50,12 @@ COPY uv /usr/local/bin/uv
 RUN set -eux; \\
     chmod +x /usr/local/bin/uv && \\
     ln -sf /usr/local/bin/uv /usr/local/bin/uvx && \\
-    mkdir -p /root/.local/bin && \\
-    ln -sf /usr/local/bin/uv /root/.local/bin/uv && \\
-    ln -sf /usr/local/bin/uv /root/.local/bin/uvx && \\
-    printf '#!/bin/sh\\nexport PATH="/root/.local/bin:/usr/local/bin:$PATH"\\n' \\
-        > /root/.local/bin/env && \\
-    chmod +x /root/.local/bin/env && \\
+    mkdir -p "$HOME/.local/bin" && \\
+    ln -sf /usr/local/bin/uv "$HOME/.local/bin/uv" && \\
+    ln -sf /usr/local/bin/uv "$HOME/.local/bin/uvx" && \\
+    printf '#!/bin/sh\\nexport PATH="$HOME/.local/bin:/usr/local/bin:$PATH"\\n' \\
+        > "$HOME/.local/bin/env" && \\
+    chmod +x "$HOME/.local/bin/env" && \\
     apt-get update -qq && \\
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl && \\
     rm -rf /var/lib/apt/lists/*

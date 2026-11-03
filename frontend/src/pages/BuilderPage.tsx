@@ -213,7 +213,7 @@ export function BuilderPage() {
       )
       setSaveConfigNotice({
         type: 'success',
-        message: '配置已保存到',
+        message: t('builder.save.success'),
         path: saved.path,
       })
       setConfigEditing(false)
@@ -221,11 +221,11 @@ export function BuilderPage() {
       const msg = err instanceof Error ? err.message : String(err)
       setSaveConfigNotice({
         type: 'error',
-        message: `配置保存失败：${msg}`,
+        message: `${t('builder.save.error')}: ${msg}`,
       })
       console.error('Failed to persist agent-shared harness_config.yaml', err)
     }
-  }, [col, updateColumn, saveCurrentHarness])
+  }, [col, updateColumn, saveCurrentHarness, t])
 
   const handleDiscardConfig = useCallback(() => {
     discardCurrentEdits()
@@ -550,7 +550,7 @@ export function BuilderPage() {
               >
                 <span style={{ color: '#8b5cf6', flexShrink: 0 }}>📖</span>
                 <span className="flex-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                  历史对话 · {col.historySessionId?.slice(0, 12)}… · 只读
+                  {t('builder.history.readonly').replace('{id}', col.historySessionId?.slice(0, 12) ?? '')}
                 </span>
                 <button
                   onClick={() => col && resumeHistorySession(col.id)}
@@ -563,7 +563,7 @@ export function BuilderPage() {
                     cursor:     'pointer',
                   }}
                 >
-                  续接此对话 →
+                  {t('builder.history.resume')}
                 </button>
               </div>
             )}

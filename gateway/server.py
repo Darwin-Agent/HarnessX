@@ -767,7 +767,7 @@ async def gateway_doc_tree(lang: str = "zh") -> GwDocTree:
         sections.append(GwDocSection(name="Gateway", items=root_items))
     for key in _GW_DOCS_SECTION_ORDER:
         if key in sections_map:
-            label = _GW_DOCS_SECTION_LABELS.get(key, key.title())
+            label = "频道" if lang == "zh" and key == "channels" else _GW_DOCS_SECTION_LABELS.get(key, key.title())
             sections.append(GwDocSection(name=label, items=sections_map[key]))
     for key, items in sections_map.items():
         if key not in _GW_DOCS_SECTION_ORDER:

@@ -58,8 +58,8 @@ channels:
   dingtalk:
     enabled: true
     channel_type: dingtalk
-    client_id: "dingxxxxxxxxxxxx"
-    client_secret: "your_client_secret"
+    client_id: "<your-client-id>"
+    client_secret: "<your-client-secret>"
     require_mention: false   # 群组中是否需要 @机器人
     max_steps: 30
 ```
@@ -72,8 +72,8 @@ channels:
 channels:
   dingtalk:
     enabled: true
-    client_id: "dingxxxxxxxxxxxx"
-    client_secret: "your_client_secret"
+    client_id: "<your-client-id>"
+    client_secret: "<your-client-secret>"
     card_template_id: "your_card_template_id"   # AI 卡片模板 ID
     require_mention: false
 ```
@@ -182,8 +182,8 @@ channels:
   dingtalk:
     enabled: true
     channel_type: dingtalk
-    client_id: "dingxxxxxxxxxxxxxxxx"
-    client_secret: "your_client_secret_here"
+    client_id: "<your-client-id>"
+    client_secret: "<your-client-secret>"
     card_template_id: "your_ai_card_template_id"
     require_mention: false
     max_steps: 30

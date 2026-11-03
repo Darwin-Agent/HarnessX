@@ -258,7 +258,7 @@ Key variables (see `.env.example` for full reference):
 ```dotenv
 # Meta-agent (Claude Opus 4.6 via Anthropic-compatible API)
 ANTHROPIC_API_BASE=https://...
-ANTHROPIC_API_KEY=sk-...
+ANTHROPIC_API_KEY="<your-api-key>"
 META_MODEL=claude-opus-4-6
 
 # Task-agent (Qwen3.5-27B served by SGLang)

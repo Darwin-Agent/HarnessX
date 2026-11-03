@@ -108,7 +108,7 @@ After starting, open **`http://localhost:8080/console/`** to access the web mana
 
 # ── Gateway server settings ────────────────────────────────────────────────
 gateway:
-  host: "0.0.0.0"        # Listen address (default 0.0.0.0)
+  host: "0.0.0.0"     # Listen address (default: all interfaces)
   port: 8080             # Listen port (default 8080)
   agent_id: "gateway"    # Global agent_id for session isolation
 
@@ -124,8 +124,8 @@ channels:
   feishu:
     enabled: true
     channel_type: feishu   # Optional, defaults to the key name
-    app_id: "cli_xxxx"
-    app_secret: "xxxx"
+    app_id: "<your-app-id>"
+    app_secret: "<your-app-secret>"
     mode: websocket        # websocket | webhook (see Feishu docs)
     require_mention: true  # Whether @mention is required in group chats
     reply_in_thread: false # Whether to reply within a thread
@@ -133,16 +133,16 @@ channels:
   dingtalk:
     enabled: false
     channel_type: dingtalk
-    client_id: "dingxxxx"
-    client_secret: "xxxx"
+    client_id: "<your-client-id>"
+    client_secret: "<your-client-secret>"
     card_template_id: ""   # Optional: AI streaming card template ID
 
   telegram_bot:
     enabled: false
     channel_type: telegram
-    bot_token: "123456:ABC-DEF..."
+    bot_token: "xoxb-..."
     allowed_users:
-      - "123456789"        # Telegram user_id allowlist (empty = everyone)
+      - "<your-user-id>"   # Telegram user ID allowlist (empty = everyone)
 
   slack:
     enabled: false
@@ -154,7 +154,7 @@ channels:
   discord:
     enabled: false
     channel_type: discord
-    bot_token: "MTxxxx..."
+    bot_token: "xoxb-..."
 
 # ── Heartbeat job (optional) ──────────────────────────────────────────────
 heartbeat:
@@ -162,7 +162,7 @@ heartbeat:
   cron: "0 9 * * 1-5"    # Every weekday at 9:00 (UTC)
   prompt: "Please summarize today's to-do items"
   channel: feishu
-  chat_id: "oc_xxxx"      # Feishu chat_id (group or DM)
+  chat_id: "<your-chat-id>"      # Feishu chat ID (group or DM)
 ```
 
 ### Model Configuration
@@ -265,7 +265,7 @@ curl -X POST http://localhost:8080/gateway/cron/jobs \
     "cron": "0 9 * * 1-5",
     "prompt": "Please generate today'\''s work summary",
     "channel": "feishu",
-    "chat_id": "oc_xxxx",
+    "chat_id": "<your-chat-id>",
     "timeout": 120
   }'
 ```

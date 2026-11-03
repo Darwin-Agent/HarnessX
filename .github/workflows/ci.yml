@@ -36,6 +36,27 @@ jobs:
       - name: Run integration tests
         run: pytest tests/integration -x -q
 
+  cpu-coevolution:
+    name: CPU co-evolution integration
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install CPU PyTorch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch
+
+      - name: Install project dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run CPU co-evolution integration tests
+        run: pytest tests/integration/test_coevolution.py -q
+
   # ── Lint & format check ──────────────────────────────────────────────────────
   lint:
     name: ruff (lint + format)

@@ -13,13 +13,12 @@
 # Usage:
 #   bash recipe/slime/launch/run_sft.sh
 
-# Kill stale processes (identical to retool)
-pkill -9 sglang 2>/dev/null; sleep 3
-ray stop --force 2>/dev/null
-pkill -9 ray 2>/dev/null; pkill -9 python 2>/dev/null; sleep 3
-pkill -9 ray 2>/dev/null; pkill -9 python 2>/dev/null
+set -e
 
-set -ex
+if [[ "${STOP_EXISTING_SERVICES:-0}" == "1" ]]; then
+    ray stop --force
+    unset RAY_ADDRESS
+fi
 
 export PYTHONBUFFERED=16
 
@@ -31,7 +30,7 @@ MEGATRON_ROOT="${MEGATRON_ROOT:?MEGATRON_ROOT env var is required}"
 DATA_ROOT="${DATA_ROOT:?DATA_ROOT env var is required}"
 export HF_HOME="${DATA_ROOT}/hf_cache"
 export HF_HUB_ENABLE_HF_TRANSFER=1
-export HF_ENDPOINT="https://hf-mirror.com"
+export HF_ENDPOINT="${HF_ENDPOINT:-https://huggingface.co}"
 CKPT_ROOT="${DATA_ROOT}/harnessx_slime/ckpt"
 
 # NVLink detection (identical to retool)
@@ -115,35 +114,33 @@ MISC_ARGS=(
 
 # ── Launch Ray ────────────────────────────────────────────────────────────────
 export MASTER_ADDR="${MASTER_ADDR:-127.0.0.1}"
-export no_proxy="127.0.0.1,${MASTER_ADDR}"
+export no_proxy="127.0.0.1,localhost,${MASTER_ADDR}${no_proxy:+,${no_proxy}}"
 
 LOCAL_IPS=$(hostname -I 2>/dev/null | tr ' ' ',' | sed 's/,$//')
-NO_PROXY_LIST="127.0.0.1,localhost,${MASTER_ADDR}${LOCAL_IPS:+,${LOCAL_IPS}}"
+NO_PROXY_LIST="${no_proxy}${LOCAL_IPS:+,${LOCAL_IPS}}${NO_PROXY:+,${NO_PROXY}}"
+export no_proxy="${NO_PROXY_LIST}"
+export NO_PROXY="${NO_PROXY_LIST}"
 
 ray start --head \
     --node-ip-address "${MASTER_ADDR}" \
     --num-gpus 8 \
     --disable-usage-stats \
-    --dashboard-host=0.0.0.0 \
-    --dashboard-port=8265
+    --dashboard-host="${RAY_DASHBOARD_HOST:-localhost}" \
+    --dashboard-port="${RAY_DASHBOARD_PORT:-8265}"
 
-RUNTIME_ENV_JSON="{
-  \"working_dir\": \"${SLIME_ROOT}\",
-  \"env_vars\": {
-    \"PYTHONPATH\": \"${MEGATRON_ROOT}:${SLIME_ROOT}:${HX_ROOT}\",
-    \"HF_HOME\": \"${DATA_ROOT}/hf_cache\",
-    \"HF_HUB_ENABLE_HF_TRANSFER\": \"1\",
-    \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
-    \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\",
-    \"PYTORCH_CUDA_ALLOC_CONF\": \"expandable_segments:True\",
-    \"no_proxy\": \"${NO_PROXY_LIST}\",
-    \"NO_PROXY\": \"${NO_PROXY_LIST}\"
-  }
-}"
+RUNTIME_ENV_JSON=$(python3 "${HX_ROOT}/recipe/slime/launch/runtime_environment.py" \
+    --working-dir "${SLIME_ROOT}" \
+    --env "PYTHONPATH=${MEGATRON_ROOT}:${SLIME_ROOT}:${HX_ROOT}" \
+    --env "HF_HOME=${DATA_ROOT}/hf_cache" \
+    --env "HF_HUB_ENABLE_HF_TRANSFER=1" --env "HF_ENDPOINT=${HF_ENDPOINT}" \
+    --env "CUDA_DEVICE_MAX_CONNECTIONS=1" \
+    --env "NCCL_NVLS_ENABLE=${HAS_NVLINK}" \
+    --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" \
+    --env "no_proxy=${NO_PROXY_LIST}" --env "NO_PROXY=${NO_PROXY_LIST}")
 
 cd "${SLIME_ROOT}"
 ray job submit \
-    --address="http://127.0.0.1:8265" \
+    --address="http://${RAY_SUBMIT_HOST:-127.0.0.1}:${RAY_DASHBOARD_PORT:-8265}" \
     --runtime-env-json="${RUNTIME_ENV_JSON}" \
     -- python3 train_async.py \
         --actor-num-nodes         1 \

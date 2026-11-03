@@ -370,12 +370,12 @@ class TestProviderGroup:
             {
                 "type": "anthropic",
                 "model": "claude-sonnet-4-6",
-                "api_key": "sk-test",
+                "api_key": "test-key-placeholder",
             }
         )
         assert len(pe.models) == 1
         assert pe.models[0].model == "claude-sonnet-4-6"
-        assert pe.api_key == "sk-test"
+        assert pe.api_key == "test-key-placeholder"
 
     def test_provider_entry_from_dict_multi_model(self):
         pe = ProviderEntry.from_dict(

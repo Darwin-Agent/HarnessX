@@ -43,7 +43,7 @@ class TestApiMcpConfig:
                     {
                         "name": "wiki",
                         "transport": "http",
-                        "url": "http://127.0.0.1:9000/mcp",
+                        "url": "https://mcp-service.invalid/mcp",
                         "enabled": True,
                     }
                 ]
